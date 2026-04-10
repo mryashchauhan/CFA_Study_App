@@ -266,7 +266,12 @@ export default function PlannerScreen() {
                   pressed && { opacity: 0.8 }
                 ]}
               >
-                {on && <LinearGradient colors={GRADIENTS.glass} style={StyleSheet.absoluteFillObject} borderRadius={R.xs} />}
+                {on && (
+                  <LinearGradient 
+                    colors={GRADIENTS.glass} 
+                    style={[StyleSheet.absoluteFillObject, { borderRadius: R.xs }]} 
+                  />
+                )}
                 <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
               </Pressable>
             );
@@ -276,8 +281,7 @@ export default function PlannerScreen() {
         <View style={[s.heroCard, SHADOWS.shadowGlass]}>
           <LinearGradient
             colors={['rgba(255,255,255,0.01)', 'transparent']}
-            style={StyleSheet.absoluteFillObject}
-            borderRadius={R.md}
+            style={[StyleSheet.absoluteFillObject, { borderRadius: R.md }]}
           />
           <View style={s.heroHeader}>
             <View style={s.heroTtlRow}>
@@ -352,7 +356,7 @@ export default function PlannerScreen() {
                   const hard = t.lod === 'Hard';
                   const easy = t.lod === 'Easy';
                   
-                  let lodColor = C.warning;
+                  let lodColor: string = C.warning;
                   let lodBg = 'rgba(245, 158, 11, 0.05)';
                   
                   if (hard) {

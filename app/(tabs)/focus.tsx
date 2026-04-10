@@ -247,7 +247,12 @@ export default function FocusScreen() {
               const on = r === ratio;
               return (
                 <Pressable key={r} onPress={() => setRatio(r)} style={[s.pill, on && s.pillOn]}>
-                  {on && <LinearGradient colors={GRADIENTS.glass} style={StyleSheet.absoluteFillObject} borderRadius={R.pill} />}
+                   {on && (
+                    <LinearGradient 
+                      colors={GRADIENTS.glass} 
+                      style={[StyleSheet.absoluteFillObject, { borderRadius: R.pill }]} 
+                    />
+                  )}
                   <Text style={[s.pillTxt, on && s.pillTxtOn]}>{r}m</Text>
                 </Pressable>
               );
