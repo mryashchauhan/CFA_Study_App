@@ -331,7 +331,7 @@ export default function PlannerScreen() {
                              onPress={() => bump(t.id, -1)}
                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
                            >
-                             <Minus size={22} color={C.textSecondary} />
+                             <Minus size={26} color={C.textSecondary} />
                            </Pressable>
                            <Text style={s.stepVal}>{t.questionsSolved}</Text>
                            <Pressable
@@ -342,7 +342,7 @@ export default function PlannerScreen() {
                                pressed && { opacity: 0.6 }
                              ]}
                            >
-                             <Plus size={22} color={C.white} />
+                             <Plus size={26} color={C.white} />
                            </Pressable>
                          </View>
                        </View>
@@ -478,16 +478,16 @@ const s = StyleSheet.create({
     paddingVertical: SPACING.md,
     paddingHorizontal: SPACING.md,
     borderRadius: R.pill,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: C.borderStrong,
     gap: SPACING.lg,
   },
   stepBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: C.surfaceElevated,
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: C.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
@@ -498,7 +498,7 @@ const s = StyleSheet.create({
   },
   stepVal: {
     color: C.textPrimary,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: '800',
     minWidth: 50,
     textAlign: 'center',
