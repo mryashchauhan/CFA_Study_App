@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Minus, LayoutGrid, Zap, Target } from 'lucide-react-native';
+import { Plus, Minus, LayoutGrid, Zap, Target, RefreshCcw, WifiOff } from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
 import {
@@ -62,7 +62,7 @@ async function seedTopics(uid: string, exam: ExamType) {
 }
 
 export default function PlannerScreen() {
-  const { userId, authReady } = useTimer();
+  const { userId, authReady, refreshAuth } = useTimer();
   const { width } = useWindowDimensions();
 
   const [selectedExam, setSelectedExam] = useState<ExamType>('CFA');
@@ -210,6 +210,27 @@ export default function PlannerScreen() {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG }]}>
         <ActivityIndicator size="large" color={C.accentIndigo} />
+      </View>
+    );
+  }
+
+  if (!userId) {
+    return (
+      <View style={[s.center, { backgroundColor: C.primaryBG, padding: SPACING.xl }]}>
+        <WifiOff size={48} color={C.textMuted} style={{ marginBottom: SPACING.lg }} />
+        <Text style={[TYPOGRAPHY.sectionTitle, { color: C.white, textAlign: 'center', marginBottom: 8 }]}>Connection Required</Text>
+        <Text style={[TYPOGRAPHY.body, { textAlign: 'center', opacity: 0.6, marginBottom: SPACING.xxl }]}>
+          Unable to establish a secure session with the syllabus database. Please check your internet connection.
+        </Text>
+        <Pressable 
+          onPress={refreshAuth}
+          style={({ pressed }) => [s.retryBtn, pressed && { opacity: 0.8 }]}
+        >
+          <LinearGradient colors={GRADIENTS.cta} style={s.retryGradient}>
+            <RefreshCcw size={18} color={C.white} style={{ marginRight: 8 }} />
+            <Text style={TYPOGRAPHY.buttonText}>Retry Connection</Text>
+          </LinearGradient>
+        </Pressable>
       </View>
     );
   }
@@ -576,5 +597,18 @@ const s = StyleSheet.create({
     minWidth: 30,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
+  },
+  
+  retryBtn: {
+    borderRadius: R.sm,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 240,
+  },
+  retryGradient: {
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

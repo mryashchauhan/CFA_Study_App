@@ -42,6 +42,7 @@ export interface TimerCtx {
   pauseTimer:    () => void;
   resetTimer:    () => void;
   submitRecall:  () => void;
+  refreshAuth:   () => void;
 }
 
 const Ctx = createContext<TimerCtx | null>(null);
@@ -86,32 +87,38 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stateRef.current = { ratio, exam, section, topic };
   }, [ratio, exam, section, topic]);
 
+  const loadAll = useCallback(async (mounted: boolean) => {
+    // Load persistence
+    try {
+      const saved = await AsyncStorage.getItem('strictMode');
+      if (saved !== null && mounted) setStrictRaw(JSON.parse(saved));
+    } catch (e) {
+      console.warn('Failed to load strictMode:', e);
+    }
+
+    // Ensure Auth
+    try {
+      setAuthReady(false); // Reset for retry
+      const uid = await ensureAuth();
+      if (mounted) {
+        setUserId(uid);
+        setAuthReady(true);
+      }
+    } catch (err) {
+      console.error('Auth error:', err);
+      if (mounted) {
+        setUserId(null);
+        setAuthReady(true);
+      }
+    }
+  }, []);
+
   /* ── 1. Auth & Persistence ────────── */
   useEffect(() => {
     let mounted = true;
-    (async () => {
-      // Load persistence
-      try {
-        const saved = await AsyncStorage.getItem('strictMode');
-        if (saved !== null && mounted) setStrictRaw(JSON.parse(saved));
-      } catch (e) {
-        console.warn('Failed to load strictMode:', e);
-      }
-
-      // Ensure Auth
-      try {
-        const uid = await ensureAuth();
-        if (mounted) {
-          setUserId(uid);
-          setAuthReady(true);
-        }
-      } catch (err) {
-        console.error('Auth error:', err);
-        if (mounted) setAuthReady(true);
-      }
-    })();
+    loadAll(mounted);
     return () => { mounted = false; };
-  }, []);
+  }, [loadAll]);
 
   /* ── 2. Tick ──────────────────────── */
   useEffect(() => {
@@ -384,6 +391,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         pauseTimer,
         resetTimer,
         submitRecall,
+        refreshAuth: () => loadAll(true),
       }}
     >
       {children}

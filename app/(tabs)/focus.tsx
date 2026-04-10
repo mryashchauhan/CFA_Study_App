@@ -120,7 +120,12 @@ export default function FocusScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.pathBadge}>
-          <Text style={s.pathTxt} numberOfLines={1}>
+          <Text 
+            style={s.pathTxt} 
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
+          >
             {exam}  ›  {pretty(section)}  ›  {topic}
           </Text>
         </View>

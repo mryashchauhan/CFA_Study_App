@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "CFA Study",
-    "slug": "cfa-study-app",
+    "slug": "CFA_Study_App",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
