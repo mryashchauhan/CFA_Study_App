@@ -1,27 +1,28 @@
 {
   "expo": {
-    "name": "CFA_Study_App",
-    "slug": "CFA_Study_App",
+    "name": "CFA Study",
+    "slug": "cfa-study-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "cfastudyapp",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#000000",
+    "backgroundColor": "#02040C",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#02040C"
     },
     "ios": {
       "supportsTablet": true
     },
     "android": {
-      "package": "com.mryash.cfastudyapp",
+      "package": "com.mryash.cfastudy",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#02040C"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false

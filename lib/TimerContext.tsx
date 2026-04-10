@@ -7,6 +7,7 @@ import React, {
   useState,
 } from 'react';
 import { AppState, AppStateStatus, Alert, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase, ensureAuth } from './supabaseClient';
 import { SYLLABUS, ExamType, EXAM_LIST } from '@/constants/theme';
 
@@ -85,15 +86,30 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stateRef.current = { ratio, exam, section, topic };
   }, [ratio, exam, section, topic]);
 
-  /* ── 1. Auth ──────────────────────── */
+  /* ── 1. Auth & Persistence ────────── */
   useEffect(() => {
     let mounted = true;
-    ensureAuth()
-      .then(uid => { if (mounted) { setUserId(uid); setAuthReady(true); } })
-      .catch(err => {
+    (async () => {
+      // Load persistence
+      try {
+        const saved = await AsyncStorage.getItem('strictMode');
+        if (saved !== null && mounted) setStrictRaw(JSON.parse(saved));
+      } catch (e) {
+        console.warn('Failed to load strictMode:', e);
+      }
+
+      // Ensure Auth
+      try {
+        const uid = await ensureAuth();
+        if (mounted) {
+          setUserId(uid);
+          setAuthReady(true);
+        }
+      } catch (err) {
         console.error('Auth error:', err);
         if (mounted) setAuthReady(true);
-      });
+      }
+    })();
     return () => { mounted = false; };
   }, []);
 
@@ -157,38 +173,42 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
     /* initial fetch */
     (async () => {
-      const { data } = await supabase
-        .from('timer_state')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      try {
+        const { data } = await supabase
+          .from('timer_state')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
 
-      if (data) {
-        syncLock.current = true;
-        if (data.is_active && data.end_time) {
-          const rem = Math.max(
-            0,
-            Math.round(
-              (new Date(data.end_time).getTime() - Date.now()) / 1000,
-            ),
-          );
-          if (rem > 0) {
-            setTimeLeft(rem);
-            setIsActive(true);
+        if (data) {
+          syncLock.current = true;
+          if (data.is_active && data.end_time) {
+            const rem = Math.max(
+              0,
+              Math.round(
+                (new Date(data.end_time).getTime() - Date.now()) / 1000,
+              ),
+            );
+            if (rem > 0) {
+              setTimeLeft(rem);
+              setIsActive(true);
+            } else {
+              setTimeLeft(0);
+              setIsActive(false);
+              setFinished(true);
+            }
           } else {
-            setTimeLeft(0);
+            setTimeLeft(data.remaining_seconds ?? data.duration_seconds ?? 1500);
             setIsActive(false);
-            setFinished(true);
           }
-        } else {
-          setTimeLeft(data.remaining_seconds ?? data.duration_seconds ?? 1500);
-          setIsActive(false);
+          if (data.duration_seconds) setRatioRaw(Math.round(data.duration_seconds / 60));
+          if (data.exam)    setExamRaw(data.exam);
+          if (data.section) setSectionRaw(data.section);
+          if (data.topic)   setTopicRaw(data.topic);
+          setTimeout(() => { syncLock.current = false; }, 600);
         }
-        if (data.duration_seconds) setRatioRaw(Math.round(data.duration_seconds / 60));
-        if (data.exam)    setExamRaw(data.exam);
-        if (data.section) setSectionRaw(data.section);
-        if (data.topic)   setTopicRaw(data.topic);
-        setTimeout(() => { syncLock.current = false; }, 600);
+      } catch (error) {
+        console.warn('Supabase sync failed (timer initial):', error);
       }
     })();
 
@@ -351,7 +371,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setExam,
         setSection,
         setTopic,
-        setStrictMode: setStrictRaw,
+        setStrictMode: async (v: boolean) => {
+          setStrictRaw(v);
+          try {
+            await AsyncStorage.setItem('strictMode', JSON.stringify(v));
+          } catch (e) {
+            console.warn('Failed to save strictMode:', e);
+          }
+        },
         setRecallText: setRecall,
         startTimer,
         pauseTimer,

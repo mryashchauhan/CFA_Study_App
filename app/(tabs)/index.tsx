@@ -7,9 +7,10 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Pressable,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Minus } from 'lucide-react-native';
+import { Plus, Minus, LayoutGrid, Zap, Target } from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
 import {
@@ -18,6 +19,7 @@ import {
   SPACING,
   TYPOGRAPHY,
   SHADOWS,
+  GRADIENTS,
   SYLLABUS,
   EXAM_LIST,
   EXAM_DATES,
@@ -37,22 +39,26 @@ interface Topic {
 }
 
 async function seedTopics(uid: string, exam: ExamType) {
-  const sections = SYLLABUS[exam];
-  if (!sections) return;
-  const rows = Object.entries(sections).flatMap(([section, topics]) =>
-    topics.map(topic => ({
-      user_id: uid,
-      exam,
-      section,
-      topic,
-      questionsSolved: 0,
-      totalQuestions: 50,
-      lod: 'Medium' as const,
-    })),
-  );
-  await supabase.from('topics').upsert(rows, {
-    onConflict: 'user_id,exam,section,topic',
-  });
+  try {
+    const sections = SYLLABUS[exam];
+    if (!sections) return;
+    const rows = Object.entries(sections).flatMap(([section, topics]) =>
+      topics.map(topic => ({
+        user_id: uid,
+        exam,
+        section,
+        topic,
+        questionsSolved: 0,
+        totalQuestions: 50,
+        lod: 'Medium' as const,
+      })),
+    );
+    await supabase.from('topics').upsert(rows, {
+      onConflict: 'user_id,exam,section,topic',
+    });
+  } catch (error) {
+    console.warn('Supabase sync failed (seed):', error);
+  }
 }
 
 export default function PlannerScreen() {
@@ -66,8 +72,8 @@ export default function PlannerScreen() {
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
   const numCols = isDesktop ? 3 : isTablet ? 2 : 1;
-  const pad = SPACING.xl;
-  const gap = SPACING.lg;
+  const pad = isDesktop ? SPACING.xl : SPACING.lg; // Tightened
+  const gap = SPACING.md; // Denser
   const cardW = numCols === 1
     ? '100%'
     : (width - pad * 2 - gap * (numCols - 1)) / numCols;
@@ -78,30 +84,35 @@ export default function PlannerScreen() {
     setLoading(true);
 
     (async () => {
-      const { data } = await supabase
-        .from('topics')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('exam', selectedExam)
-        .order('section')
-        .order('topic');
-
-      if (!alive) return;
-
-      if (!data || data.length === 0) {
-        await seedTopics(userId, selectedExam);
-        const { data: seeded } = await supabase
+      try {
+        const { data } = await supabase
           .from('topics')
           .select('*')
           .eq('user_id', userId)
           .eq('exam', selectedExam)
           .order('section')
           .order('topic');
-        if (alive) setTopics((seeded ?? []) as Topic[]);
-      } else {
-        setTopics(data as Topic[]);
+
+        if (!alive) return;
+
+        if (!data || data.length === 0) {
+          await seedTopics(userId, selectedExam);
+          const { data: seeded } = await supabase
+            .from('topics')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('exam', selectedExam)
+            .order('section')
+            .order('topic');
+          if (alive) setTopics((seeded ?? []) as Topic[]);
+        } else {
+          setTopics(data as Topic[]);
+        }
+      } catch (error) {
+        console.warn('Supabase sync failed (load):', error);
+      } finally {
+        if (alive) setLoading(false);
       }
-      if (alive) setLoading(false);
     })();
 
     const ch = supabase
@@ -152,13 +163,16 @@ export default function PlannerScreen() {
         }),
       );
       
-      // Delay slightly to ensure UI reacts first
       await new Promise(res => setTimeout(res, 50));
       
-      await supabase
-        .from('topics')
-        .update({ questionsSolved: vToSave, updated_at: new Date().toISOString() })
-        .eq('id', id);
+      try {
+        await supabase
+          .from('topics')
+          .update({ questionsSolved: vToSave, updated_at: new Date().toISOString() })
+          .eq('id', id);
+      } catch (error) {
+        console.warn('Supabase sync failed (bump):', error);
+      }
     },
     [],
   );
@@ -170,7 +184,11 @@ export default function PlannerScreen() {
       if (!row) return;
       const next = order[(order.indexOf(row.lod) + 1) % 3];
       setTopics(prev => prev.map(t => (t.id === id ? { ...t, lod: next } : t)));
-      await supabase.from('topics').update({ lod: next }).eq('id', id);
+      try {
+        await supabase.from('topics').update({ lod: next }).eq('id', id);
+      } catch (error) {
+        console.warn('Supabase sync failed (lod):', error);
+      }
     },
     [topics],
   );
@@ -179,11 +197,8 @@ export default function PlannerScreen() {
   const solved   = topics.reduce((s, t) => s + t.questionsSolved, 0);
   const remain   = totalQ - solved;
   const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
-  const daysLeft = Math.max(
-    1,
-    Math.ceil((examDate.getTime() - Date.now()) / 86_400_000),
-  );
-  const daily    = (remain / daysLeft).toFixed(1);
+  const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
+  const daily    = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
   const pct      = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
@@ -193,10 +208,9 @@ export default function PlannerScreen() {
 
   if (!authReady) {
     return (
-      <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={s.center}>
-        <ActivityIndicator size="large" color={C.accentTeal} />
-        <Text style={[TYPOGRAPHY.body, { marginTop: SPACING.md }]}>Authenticating…</Text>
-      </LinearGradient>
+      <View style={[s.center, { backgroundColor: C.primaryBG }]}>
+        <ActivityIndicator size="large" color={C.accentIndigo} />
+      </View>
     );
   }
 
@@ -205,16 +219,17 @@ export default function PlannerScreen() {
   return (
     <View style={s.root}>
       <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
-      <View style={[s.blob, s.blob1]} />
-      <View style={[s.blob, s.blob2]} />
+      
+      {/* Background Atmosphere - Obsidians */}
+      <View style={[s.blob, s.blob1, { opacity: 0.02 }]} />
       
       <ScrollView
         contentContainerStyle={[s.scroll, { paddingHorizontal: pad }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={s.header}>
-          <Text style={titleStyle}>Study Planner</Text>
-          <Text style={s.subtitle}>Overview & Progress Tracking</Text>
+          <Text style={[titleStyle, { fontSize: 34, fontWeight: '800' }]}>Study Planner</Text>
+          <Text style={[s.subtitle, { fontSize: 15, color: 'rgba(255,255,255,0.5)' }]}>Overview & Progress Tracking</Text>
         </View>
 
         <View style={s.pills}>
@@ -226,11 +241,11 @@ export default function PlannerScreen() {
                 onPress={() => setSelectedExam(e)}
                 style={({ pressed }) => [
                   s.examPill,
-                  on && s.examPillOn,
-                  on && SHADOWS.glowTeal,
+                  on ? s.examPillOn : s.examPillOff,
                   pressed && { opacity: 0.8 }
                 ]}
               >
+                {on && <LinearGradient colors={GRADIENTS.glass} style={StyleSheet.absoluteFillObject} borderRadius={R.xs} />}
                 <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
               </Pressable>
             );
@@ -238,10 +253,18 @@ export default function PlannerScreen() {
         </View>
 
         <View style={[s.heroCard, SHADOWS.shadowGlass]}>
+          <LinearGradient
+            colors={['rgba(255,255,255,0.01)', 'transparent']}
+            style={StyleSheet.absoluteFillObject}
+            borderRadius={R.md}
+          />
           <View style={s.heroHeader}>
-            <Text style={TYPOGRAPHY.cardTitle}>🎯 {selectedExam} Progress</Text>
+            <View style={s.heroTtlRow}>
+               <Zap size={20} color={C.accentCyan} />
+               <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
+            </View>
             <View style={s.heroBadge}>
-              <Text style={TYPOGRAPHY.meta}>
+              <Text style={s.badgeTxt}>
                 {examDate.toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
@@ -258,27 +281,47 @@ export default function PlannerScreen() {
             ].map(([lbl, val]) => (
               <View key={lbl} style={s.statBox}>
                 <Text style={s.statLbl}>{lbl}</Text>
-                <Text style={s.statVal}>{val}</Text>
+                <View style={s.valContainer}>
+                  <Text 
+                    numberOfLines={1} 
+                    adjustsFontSizeToFit 
+                    style={s.statVal}
+                  >
+                    {val}
+                  </Text>
+                </View>
               </View>
             ))}
           </View>
 
-          <Text style={s.pacing}>
-            Required: <Text style={{ color: C.accentTeal, fontWeight: '700' }}>{daily} Qs / day</Text>
-          </Text>
-
-          <View style={s.barBgHero}>
-            <View style={[s.barFillHero, { width: `${pct}%` }]} />
+          <View style={s.pacingWrap}>
+             <Text style={s.pacing}>
+               Required Pace: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
+             </Text>
           </View>
-          <Text style={s.pctTxt}>{pct}%</Text>
+
+          <View style={s.barContainer}>
+            <View style={s.barBgHero}>
+              <LinearGradient
+                colors={GRADIENTS.premiumCTA}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[s.barFillHero, { width: `${pct}%` }]}
+              />
+            </View>
+            <Text style={s.pctTxt}>{pct}% Mastery</Text>
+          </View>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color={C.accentTeal} style={{ marginTop: SPACING.xxl }} />
+          <ActivityIndicator size="large" color={C.accentIndigo} style={{ marginTop: SPACING.xxl }} />
         ) : (
           Object.entries(grouped).map(([sec, rows]) => (
-            <View key={sec} style={{ marginBottom: SPACING.xxl }}>
-              <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel]}>{pretty(sec)}</Text>
+            <View key={sec} style={{ marginBottom: SPACING.xl }}>
+              <View style={s.secHead}>
+                <LayoutGrid size={18} color={C.accentCyan} />
+                <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel, { fontSize: 20, fontWeight: '800', color: C.white }]}>{pretty(sec)}</Text>
+              </View>
 
               <View style={[s.grid, { gap }]}>
                 {rows.map(t => {
@@ -289,14 +332,14 @@ export default function PlannerScreen() {
                   const easy = t.lod === 'Easy';
                   
                   let lodColor = C.warning;
-                  let lodBg = 'rgba(251, 191, 36, 0.15)';
+                  let lodBg = 'rgba(245, 158, 11, 0.05)';
                   
                   if (hard) {
                     lodColor = C.accentRed;
-                    lodBg = C.accentRedSoft;
+                    lodBg = 'rgba(239, 68, 68, 0.08)';
                   } else if (easy) {
                     lodColor = C.success;
-                    lodBg = 'rgba(52, 211, 153, 0.15)';
+                    lodBg = 'rgba(16, 185, 129, 0.08)';
                   }
 
                   return (
@@ -304,12 +347,11 @@ export default function PlannerScreen() {
                        <View 
                         style={[
                           s.topicCard, 
-                          SHADOWS.shadowSoft,
-                          hard && { borderColor: C.accentRed, ...SHADOWS.glowRed }
+                          hard && { borderColor: 'rgba(239, 68, 68, 0.2)' }
                         ]}
                        >
                          <View style={s.topicHead}>
-                           <Text style={TYPOGRAPHY.meta} numberOfLines={1}>{pretty(t.section)}</Text>
+                           <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
                            <Pressable
                              onPress={() => cycleLod(t.id)}
                              style={[s.lodBadge, { backgroundColor: lodBg }]}
@@ -322,28 +364,35 @@ export default function PlannerScreen() {
                            {t.topic}
                          </Text>
 
-                         <Text style={[TYPOGRAPHY.body, s.progTxt]}>
-                           {prog}% • {t.questionsSolved}/{t.totalQuestions}
-                         </Text>
+                         <View style={s.topicStatLine}>
+                            <Text style={s.progValue}>{prog}%</Text>
+                            <Text style={s.solvedSplit}>{t.questionsSolved} / {t.totalQuestions}</Text>
+                         </View>
+                         
+                         <View style={s.miniBarBg}>
+                            <View style={[s.miniBarFill, { width: `${prog}%`, backgroundColor: hard ? C.accentRed : C.accentIndigo }]} />
+                         </View>
 
                          <View style={s.glassStrip}>
-                           <Pressable
-                             onPress={() => bump(t.id, -1)}
-                             style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
-                           >
-                             <Minus size={26} color={C.textSecondary} />
-                           </Pressable>
-                           <Text style={s.stepVal}>{t.questionsSolved}</Text>
-                           <Pressable
-                             onPress={() => bump(t.id, 1)}
-                             style={({ pressed }) => [
-                               s.stepBtn, 
-                               s.stepBtnAdd,
-                               pressed && { opacity: 0.6 }
-                             ]}
-                           >
-                             <Plus size={26} color={C.white} />
-                           </Pressable>
+                            <Pressable
+                              onPress={() => bump(t.id, -1)}
+                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
+                            >
+                              <Minus size={20} color={C.textMuted} />
+                            </Pressable>
+                            
+                            <Text style={s.stepVal}>{t.questionsSolved}</Text>
+                            
+                            <Pressable
+                              onPress={() => bump(t.id, 1)}
+                              style={({ pressed }) => [
+                                s.stepBtn, 
+                                s.stepBtnAdd,
+                                pressed && { opacity: 0.6 }
+                              ]}
+                            >
+                              <Plus size={20} color={C.white} />
+                            </Pressable>
                          </View>
                        </View>
                     </View>
@@ -363,144 +412,168 @@ const s = StyleSheet.create({
   blob: {
     position: 'absolute',
     borderRadius: 9999,
-    width: 600,
-    height: 600,
-    opacity: 0.3,
+    width: 400,
+    height: 400,
   },
-  blob1: {
-    top: -200,
-    left: -150,
-    backgroundColor: C.accentTealSoft,
-  },
-  blob2: {
-    bottom: -100,
-    right: -200,
-    backgroundColor: C.accentBlueSoft,
-  },
-  scroll: { paddingTop: SPACING.xxxl, paddingBottom: SPACING.xxxl },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  header: { marginBottom: SPACING.xxl },
-  subtitle: { ...TYPOGRAPHY.body, marginTop: SPACING.xs },
+  blob1: { top: -100, left: -100, backgroundColor: C.accentIndigo },
+
+  scroll: { paddingTop: SPACING.xl, paddingBottom: SPACING.xxxl },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginBottom: SPACING.xxl },
+  header: { marginBottom: SPACING.lg, paddingHorizontal: SPACING.xs },
+  subtitle: { ...TYPOGRAPHY.body, fontSize: 13, marginTop: 4, opacity: 0.5 },
+  
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.xl },
   examPill: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: R.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: R.xs,
     borderWidth: 1,
-    borderColor: C.borderStrong,
-    backgroundColor: C.surfaceSoft,
+    overflow: 'hidden',
   },
-  examPillOn: { borderColor: C.accentTeal, backgroundColor: C.surfaceElevated },
-  examPillTxt: { color: C.textSecondary, fontSize: 15, fontWeight: '600' },
-  examPillTxtOn: { color: C.accentTeal },
+  examPillOff: {
+    borderColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  examPillOn: { 
+    borderColor: C.accentCyan, 
+    borderWidth: 2,
+    backgroundColor: 'rgba(6,182,212,0.1)' 
+  },
+  examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
+  examPillTxtOn: { color: C.white },
 
   heroCard: {
     backgroundColor: C.surface,
-    borderRadius: R.xl,
-    borderWidth: 1,
-    borderColor: C.border,
-    padding: SPACING.xl,
-    marginBottom: SPACING.xxxl,
+    borderRadius: R.md,
+    borderWidth: 1.5,
+    borderColor: 'rgba(34, 211, 238, 0.2)',
+    padding: SPACING.lg,
+    marginBottom: SPACING.xxl,
+    overflow: 'hidden',
   },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  heroTtlRow: { flexDirection: 'row', alignItems: 'center' },
   heroBadge: {
-    backgroundColor: C.surfaceElevated,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 6,
-    borderRadius: R.sm,
+    backgroundColor: '#000',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
+  badgeTxt: { ...TYPOGRAPHY.meta, color: C.textSecondary, fontSize: 9, letterSpacing: 0.5 },
+  
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: SPACING.lg,
+    backgroundColor: '#000',
+    padding: SPACING.md,
+    borderRadius: R.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    gap: 12,
   },
-  statBox: { alignItems: 'center', flex: 1 },
-  statLbl: { ...TYPOGRAPHY.meta, marginBottom: SPACING.xs },
-  statVal: { color: C.textPrimary, fontSize: 26, fontWeight: '800' },
-  pacing: { ...TYPOGRAPHY.body, textAlign: 'center', marginTop: SPACING.lg, marginBottom: SPACING.md },
+  statBox: { 
+    alignItems: 'center', 
+    justifyContent: 'center',
+    flex: 1,
+  },
+  statLbl: { 
+    ...TYPOGRAPHY.meta, 
+    marginBottom: 6, 
+    fontSize: 9, 
+    opacity: 0.6,
+    textAlign: 'center',
+  },
+  valContainer: {
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+  },
+  statVal: { color: C.white, fontSize: 40, fontWeight: '900', lineHeight: 48, textAlign: 'center' },
   
+  pacingWrap: { marginTop: SPACING.md, alignItems: 'center' },
+  pacing: { ...TYPOGRAPHY.body, fontSize: 13, opacity: 0.7 },
+  
+  barContainer: { marginTop: SPACING.lg },
   barBgHero: {
-    height: 8,
-    backgroundColor: C.surfaceElevated,
-    borderRadius: 4,
+    height: 6,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 3,
     overflow: 'hidden',
   },
-  barFillHero: {
-    height: 8,
-    backgroundColor: C.accentTeal,
-    borderRadius: 4,
-  },
+  barFillHero: { height: 6, borderRadius: 3 },
   pctTxt: {
-    color: C.textSecondary,
-    fontSize: 13,
-    textAlign: 'right',
-    marginTop: SPACING.xs,
-    fontWeight: '600',
+    color: C.textMuted,
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 6,
+    fontWeight: '700',
   },
 
-  sectionLabel: { marginBottom: SPACING.lg, paddingLeft: SPACING.xs },
+  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md, paddingLeft: SPACING.xs },
+  sectionLabel: { marginBottom: 0, marginLeft: 8, fontSize: 16, opacity: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
   topicCard: {
     backgroundColor: C.surface,
-    borderRadius: R.lg,
+    borderRadius: R.md,
     borderWidth: 1,
-    borderColor: C.border,
-    padding: SPACING.lg,
+    borderColor: 'rgba(255, 255, 255, 0.04)',
+    padding: SPACING.md,
   },
   topicHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: 8,
   },
-  lodBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: R.sm,
-  },
-  lodTxt: { fontSize: 11, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 0.8 },
-  topicName: { marginBottom: SPACING.md, fontSize: 22, fontWeight: '800', color: C.textPrimary },
-  progTxt: { marginBottom: SPACING.lg },
+  topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
+  lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
+  topicName: { marginBottom: SPACING.md, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  
+  topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
+  solvedSplit: { color: C.textMuted, fontSize: 11, fontWeight: '600', opacity: 0.5 },
+  
+  miniBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, marginBottom: SPACING.lg, overflow: 'hidden' },
+  miniBarFill: { height: 3, borderRadius: 1.5 },
 
   glassStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.surfaceSoft,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.md,
-    borderRadius: R.pill,
-    borderWidth: 1.5,
-    borderColor: C.borderStrong,
-    gap: SPACING.lg,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    borderRadius: R.xs,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    gap: 20,
   },
   stepBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: C.surfaceElevated,
-    borderWidth: 1.5,
-    borderColor: C.borderStrong,
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepBtnAdd: {
-    backgroundColor: C.accentBlueSoft,
-    borderColor: C.accentBlue,
+    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+    borderColor: 'rgba(99, 102, 241, 0.3)',
   },
   stepVal: {
     color: C.textPrimary,
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: '800',
-    minWidth: 50,
+    minWidth: 30,
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },

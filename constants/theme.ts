@@ -2,33 +2,38 @@ import { Platform, TextStyle, ViewStyle } from 'react-native';
 
 /* ── Colors ───────────────────────────────────── */
 export const C = {
-  primaryBG: '#0A0D14',
-  secondaryBG: '#0F131B',
-  surface: 'rgba(20, 24, 32, 0.88)',
-  surfaceSoft: 'rgba(28, 33, 43, 0.72)',
-  surfaceElevated: 'rgba(24, 28, 38, 0.96)',
-  border: 'rgba(255,255,255,0.07)',
-  borderStrong: 'rgba(255,255,255,0.12)',
-  textPrimary: '#F5F7FB',
-  textSecondary: '#A7B0BE',
-  textMuted: '#7F8795',
-  accentRed: '#FF3B30',
-  accentRedSoft: 'rgba(255,59,48,0.16)',
-  accentTeal: '#4FD1C5',
-  accentTealSoft: 'rgba(79,209,197,0.18)',
-  accentBlue: '#7CC7FF',
-  accentBlueSoft: 'rgba(124,199,255,0.16)',
-  success: '#34D399',
-  warning: '#FBBF24',
+  primaryBG: '#02040C', // Deep Night Navy (Inky AMOLED)
+  secondaryBG: '#050812', // Subtle Depth
+  surface: '#0D111A', // Richer Dark Surface
+  surfaceSoft: '#121724',
+  surfaceElevated: 'rgba(30, 36, 50, 0.95)',
+  border: 'rgba(255, 255, 255, 0.18)', // Higher luster
+  borderStrong: 'rgba(255, 255, 255, 0.28)',
+  textPrimary: '#F8FAFC',
+  textSecondary: '#E2E8F0',
+  textMuted: '#94A3B8', 
+  accentRed: '#FF3333', // More saturated
+  accentRedSoft: 'rgba(255, 51, 51, 0.12)',
+  accentTeal: '#00E5D1',
+  accentTealSoft: 'rgba(0, 229, 209, 0.12)',
+  accentBlue: '#00B4FF',
+  accentBlueSoft: 'rgba(0, 180, 255, 0.12)',
+  accentIndigo: '#4D4DFF', // Pure Electric Indigo
+  accentViolet: '#8B5CF6',
+  accentCyan: '#00F2FF', // Max Neon Cyan
+  accentPink: '#FF00E5', // Neon Pink
+  success: '#00FF99',
+  warning: '#FFB800',
   white: '#FFFFFF',
 } as const;
 
 /* ── Gradients ────────────────────────────────── */
 export const GRADIENTS = {
-  cta: ['#FF5147', '#CC2E1F'] as const,
-  premiumCTA: ['#4F46E5', '#7C3AED', '#EC4899'] as const, // Indigo -> Violet -> Pink edge
-  timerHalo: ['rgba(76, 29, 149, 0.4)', 'rgba(190, 24, 93, 0.2)'] as const, // Deep purple -> warm glow
-  timerRing: ['#8B5CF6', '#EC4899'] as const,
+  cta: ['#4D4DFF', '#312E81'] as const, // Pure Indigo suite
+  premiumCTA: ['#00F2FF', '#4D4DFF', '#2D1B69'] as const, // Neon Cyan -> Royal Indigo -> Deep Violet
+  timerHalo: ['rgba(0, 242, 255, 0.35)', 'rgba(77, 77, 255, 0.15)'] as const, 
+  timerRing: ['#00F2FF', '#4D4DFF'] as const, // Neon Cyan -> Indigo
+  glass: ['rgba(255,255,255,0.12)', 'rgba(255,255,255,0.03)'] as const,
 };
 
 /* ── Radii ────────────────────────────────────── */
@@ -36,8 +41,7 @@ export const R = {
   xs: 12,
   sm: 16,
   md: 20,
-  lg: 28,
-  xl: 32,
+  lg: 24, // Sharper feel  xl: 32,
   pill: 999,
 } as const;
 
@@ -54,10 +58,10 @@ export const SPACING = {
 
 /* ── Typography ───────────────────────────────── */
 export const TYPOGRAPHY = {
-  heroTimerMobile: { fontSize: 72, fontWeight: '800', letterSpacing: 1.5, color: C.accentRed } as TextStyle,
-  heroTimerTablet: { fontSize: 84, fontWeight: '800', letterSpacing: 1.5, color: C.accentRed } as TextStyle,
-  screenTitleMobile: { fontSize: 34, fontWeight: '800', color: C.textPrimary } as TextStyle,
-  screenTitleTablet: { fontSize: 42, fontWeight: '800', color: C.textPrimary } as TextStyle,
+  heroTimerMobile: { fontSize: 60, fontWeight: '800', letterSpacing: 0.5, color: C.textPrimary } as TextStyle,
+  heroTimerTablet: { fontSize: 84, fontWeight: '800', letterSpacing: 1, color: C.textPrimary } as TextStyle,
+  screenTitleMobile: { fontSize: 32, fontWeight: '800', color: C.textPrimary } as TextStyle,
+  screenTitleTablet: { fontSize: 40, fontWeight: '800', color: C.textPrimary } as TextStyle,
   sectionTitle: { fontSize: 18, fontWeight: '700', color: C.textPrimary } as TextStyle,
   cardTitle: { fontSize: 22, fontWeight: '800', color: C.textPrimary } as TextStyle,
   body: { fontSize: 15, lineHeight: 22, color: C.textSecondary } as TextStyle,
@@ -114,16 +118,16 @@ export function glow(color: string, radius: number): Record<string, any> {
 /* ── Syllabus Data ────────────────────────────── */
 export const SYLLABUS: Record<string, Record<string, string[]>> = {
   CFA: {
-    Ethics:               ['Standards of Practice', 'Code of Ethics', 'GIPS'],
-    Quantitative_Methods: ['Time Value of Money', 'Probability', 'Regression'],
-    Economics:            ['Microeconomics', 'Macroeconomics', 'Geopolitics'],
-    Corporate_Issuers:    ['Corporate Governance', 'Capital Structure', 'Business Models'],
-    FSA:                  ['Income Statements', 'Balance Sheets', 'Cash Flow Analysis'],
-    Equity:               ['Market Structure', 'Valuation Concepts', 'Industry Analysis'],
-    Fixed_Income:         ['Bond Valuation', 'Yield Measures', 'Credit Analysis'],
-    Derivatives:          ['Options', 'Forwards and Futures', 'Swaps'],
-    Alternatives:         ['Real Estate', 'Private Equity', 'Hedge Funds'],
-    Portfolio_Management: ['Risk and Return', 'Behavioral Finance', 'Technical Analysis'],
+    Ethical_Professional_Standards: ['Standards of Practice', 'Code of Ethics', 'GIPS'],
+    Quantitative_Methods:           ['Time Value of Money', 'Probability', 'Regression'],
+    Economics:                      ['Microeconomics', 'Macroeconomics', 'Geopolitics'],
+    Corporate_Issuers:              ['Corporate Governance', 'Capital Structure', 'Business Models'],
+    Financial_Statement_Analysis:   ['Income Statements', 'Balance Sheets', 'Cash Flow Analysis'],
+    Equity_Investments:             ['Market Structure', 'Valuation Concepts', 'Industry Analysis'],
+    Fixed_Income:                   ['Bond Valuation', 'Yield Measures', 'Credit Analysis'],
+    Derivatives:                    ['Options', 'Forwards and Futures', 'Swaps'],
+    Alternative_Investments:        ['Real Estate', 'Private Equity', 'Hedge Funds'],
+    Portfolio_Management:           ['Risk and Return', 'Behavioral Finance', 'Technical Analysis'],
   },
   ATMA: {
     Analytical_Reasoning: ['Coding Decoding', 'Syllogism', 'Blood Relations', 'Arrangements', 'Data Sufficiency'],
@@ -131,11 +135,11 @@ export const SYLLABUS: Record<string, Record<string, string[]>> = {
     Quantitative_Skills:  ['Data Interpretation', 'Arithmetic', 'Algebra', 'Geometry', 'Modern Math'],
   },
   MAT: {
-    Language_Comprehension:  ['Reading Comprehension', 'Sentence Correction', 'Idioms'],
-    Intelligence_Reasoning:  ['Puzzles', 'Direction Sense', 'Critical Reasoning', 'Input Output'],
-    Mathematical_Skills:     ['Arithmetic', 'Number System', 'Mensuration', 'Probability'],
-    Data_Analysis:           ['Pie Charts', 'Bar Graphs', 'Data Sufficiency', 'Venn Diagrams'],
-    Global_Environment:      ['Current Affairs', 'Indian Economy', 'Corporate News'],
+    Language_Comprehension:          ['Reading Comprehension', 'Sentence Correction', 'Idioms'],
+    Intelligence_Critical_Reasoning: ['Puzzles', 'Direction Sense', 'Critical Reasoning', 'Input Output'],
+    Mathematical_Skills:             ['Arithmetic', 'Number System', 'Mensuration', 'Probability'],
+    Data_Analysis_Sufficiency:       ['Pie Charts', 'Bar Graphs', 'Data Sufficiency', 'Venn Diagrams'],
+    Indian_Global_Environment:       ['Current Affairs', 'Indian Economy', 'Corporate News'],
   },
 };
 
