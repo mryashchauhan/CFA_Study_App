@@ -108,18 +108,22 @@ export default function FocusScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.pathBadge}>
-          <Text style={TYPOGRAPHY.meta} numberOfLines={1}>
+          <Text style={s.pathTxt} numberOfLines={1}>
             {exam}  ›  {pretty(section)}  ›  {topic}
           </Text>
         </View>
 
         <View style={[s.timerWrap, { width: TIMER_SIZE, height: TIMER_SIZE }]}>
+          <LinearGradient
+            colors={GRADIENTS.timerHalo}
+            style={[StyleSheet.absoluteFillObject, { borderRadius: 9999, transform: [{ scale: 1.15 }] }]}
+          />
           <Svg width={TIMER_SIZE} height={TIMER_SIZE} style={{ position: 'absolute' }}>
             <Circle
               cx={TIMER_SIZE / 2}
               cy={TIMER_SIZE / 2}
               r={RADIUS}
-              stroke={C.borderStrong}
+              stroke="rgba(255,255,255,0.05)"
               strokeWidth={STROKE_WIDTH}
               fill="transparent"
             />
@@ -127,7 +131,7 @@ export default function FocusScreen() {
               cx={TIMER_SIZE / 2}
               cy={TIMER_SIZE / 2}
               r={RADIUS}
-              stroke={C.textPrimary}
+              stroke="url(#timerGrad)"
               strokeWidth={STROKE_WIDTH}
               strokeDasharray={CIRCUMF}
               strokeDashoffset={strokeDashoffset}
@@ -136,6 +140,12 @@ export default function FocusScreen() {
               rotation="-90"
               origin={`${TIMER_SIZE / 2}, ${TIMER_SIZE / 2}`}
             />
+            <defs>
+              <linearGradient id="timerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={GRADIENTS.timerRing[0]} />
+                <stop offset="100%" stopColor={GRADIENTS.timerRing[1]} />
+              </linearGradient>
+            </defs>
           </Svg>
           
           <View style={s.timerInner}>
@@ -150,18 +160,17 @@ export default function FocusScreen() {
             onPress={isActive ? pauseTimer : startTimer}
             style={({ pressed }) => [
               s.mainActionWrap,
-              pressed && { opacity: 0.8 },
-              SHADOWS.glowRed
+              pressed && { opacity: 0.8 }
             ]}
           >
             <LinearGradient
-              colors={GRADIENTS.cta}
+              colors={GRADIENTS.premiumCTA}
               style={s.mainActionGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
             >
-              {isActive ? <Pause size={28} color={C.white} /> : <Play size={28} color={C.white} fill={C.white} />}
-              <Text style={TYPOGRAPHY.buttonText}>{isActive ? 'PAUSE' : 'START'}</Text>
+              {isActive ? <Pause size={32} color={C.white} /> : <Play size={32} color={C.white} fill={C.white} />}
+              <Text style={s.mainActionTxt}>{isActive ? 'PAUSE' : 'START'}</Text>
             </LinearGradient>
           </Pressable>
 
@@ -172,7 +181,7 @@ export default function FocusScreen() {
               pressed && { opacity: 0.6 }
             ]}
           >
-            <RotateCcw size={26} color={C.textSecondary} />
+            <RotateCcw size={30} color={C.textSecondary} />
           </Pressable>
         </View>
 
@@ -258,15 +267,15 @@ const s = StyleSheet.create({
   blob: {
     position: 'absolute',
     borderRadius: 9999,
-    width: 500,
-    height: 500,
-    opacity: 0.2,
+    width: 700,
+    height: 700,
+    opacity: 0.15,
   },
   blob1: {
-    top: '10%',
+    top: '5%',
     left: '50%',
-    marginLeft: -250,
-    backgroundColor: C.accentRedSoft,
+    marginLeft: -350,
+    backgroundColor: '#7C3AED',
   },
   scrollInner: {
     paddingTop: SPACING.xl,
@@ -277,58 +286,73 @@ const s = StyleSheet.create({
     alignSelf: 'center',
   },
   pathBadge: {
-    backgroundColor: C.surfaceSoft,
-    borderWidth: 1,
-    borderColor: C.borderStrong,
+    backgroundColor: 'rgba(28, 33, 43, 0.4)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.06)',
     borderRadius: R.pill,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.xxxl,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    marginBottom: SPACING.xl,
+  },
+  pathTxt: {
+    ...TYPOGRAPHY.meta,
+    letterSpacing: 1.5,
+    color: '#D1D5DB',
   },
   timerWrap: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.xxl,
   },
   timerInner: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.surface,
+    backgroundColor: '#07090E',
     borderRadius: 9999,
-    margin: 16,
+    margin: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: 'rgba(255,255,255,0.03)',
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACING.lg,
-    marginBottom: SPACING.xxxl,
+    marginBottom: SPACING.xxl,
     width: '100%',
   },
   mainActionWrap: {
     flex: 1,
-    maxWidth: 240,
-    borderRadius: 32,
+    maxWidth: 280,
+    borderRadius: 36,
     overflow: 'hidden',
+    shadowColor: '#7C3AED',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.4,
+    shadowRadius: 24,
+    elevation: 16,
   },
   mainActionGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACING.md,
-    minHeight: 64,
+    gap: SPACING.lg,
+    minHeight: 72,
     paddingHorizontal: SPACING.xxl,
   },
+  mainActionTxt: {
+    ...TYPOGRAPHY.buttonText,
+    fontSize: 22,
+    letterSpacing: 1,
+  },
   secondaryActionBtn: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: C.surfaceSoft,
-    borderWidth: 1,
-    borderColor: C.borderStrong,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: 'rgba(28, 33, 43, 0.65)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -353,30 +377,30 @@ const s = StyleSheet.create({
     marginTop: SPACING.md,
   },
   pill: {
-    paddingHorizontal: SPACING.xl,
+    paddingHorizontal: 28,
     paddingVertical: SPACING.md,
-    height: 48,
+    height: 52,
     justifyContent: 'center',
     borderRadius: R.pill,
     borderWidth: 1,
     borderColor: C.borderStrong,
-    backgroundColor: C.surfaceSoft,
+    backgroundColor: 'rgba(28, 33, 43, 0.4)',
   },
   pillOn: {
-    backgroundColor: C.accentRedSoft,
-    borderColor: C.accentRed,
+    backgroundColor: 'rgba(79, 70, 229, 0.25)',
+    borderColor: '#7C3AED',
     borderWidth: 1.5,
   },
   pillTxt: {
     color: C.textSecondary,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
   },
   pillTxtOn: {
     color: C.white,
   },
   pillOnExam: {
-    backgroundColor: C.surfaceElevated,
+    backgroundColor: 'rgba(124, 199, 255, 0.15)',
     borderColor: C.accentBlue,
     borderWidth: 1.5,
   },
@@ -398,7 +422,7 @@ const s = StyleSheet.create({
     padding: 3,
     justifyContent: 'center',
   },
-  trackOn: { backgroundColor: C.accentRed, borderColor: C.accentRed },
+  trackOn: { backgroundColor: '#7C3AED', borderColor: '#7C3AED' },
   thumb: {
     width: 24,
     height: 24,
@@ -416,7 +440,7 @@ const s = StyleSheet.create({
   },
   recallTitle: {
     ...TYPOGRAPHY.screenTitleMobile,
-    color: C.accentRed,
+    color: '#EC4899',
     marginBottom: SPACING.sm,
   },
   recallInput: {
@@ -433,7 +457,7 @@ const s = StyleSheet.create({
     marginBottom: SPACING.xl,
   },
   bigBtn: {
-    backgroundColor: C.accentRed,
+    backgroundColor: '#7C3AED',
     borderRadius: R.lg,
     paddingVertical: SPACING.lg,
     alignItems: 'center',

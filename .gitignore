@@ -40,3 +40,7 @@ yarn-error.*
 /ios
 /android
 .vercel
+
+# generated deploy output
+cfa-study-app-ui-deploy/
+dist/

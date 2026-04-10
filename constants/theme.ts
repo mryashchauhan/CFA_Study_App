@@ -26,6 +26,9 @@ export const C = {
 /* ── Gradients ────────────────────────────────── */
 export const GRADIENTS = {
   cta: ['#FF5147', '#CC2E1F'] as const,
+  premiumCTA: ['#4F46E5', '#7C3AED', '#EC4899'] as const, // Indigo -> Violet -> Pink edge
+  timerHalo: ['rgba(76, 29, 149, 0.4)', 'rgba(190, 24, 93, 0.2)'] as const, // Deep purple -> warm glow
+  timerRing: ['#8B5CF6', '#EC4899'] as const,
 };
 
 /* ── Radii ────────────────────────────────────── */
