@@ -51,8 +51,8 @@ export default function FocusScreen() {
   } = useTimer();
 
   const isDesktop = width >= 768;
-  const TIMER_SIZE = isDesktop ? 320 : 270;
-  const STROKE_WIDTH = 5; // Thinner for precision
+  const TIMER_SIZE = isDesktop ? 340 : 270;
+  const STROKE_WIDTH = isDesktop ? 6 : 5;
   const RADIUS = (TIMER_SIZE - 20) / 2;
   const CIRCUMF = 2 * Math.PI * RADIUS;
   const totalSeconds = Math.max(1, ratio * 60);
@@ -191,15 +191,15 @@ export default function FocusScreen() {
             </Svg>
 
             <LinearGradient
-              colors={['#05070A', '#000000']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              colors={['rgba(255,255,255,0.01)', 'rgba(255,255,255,0.03)']}
               style={[
-                s.timerFace,
+                s.timerContent,
                 {
-                  width: TIMER_SIZE - 24,
-                  height: TIMER_SIZE - 24,
-                  borderRadius: (TIMER_SIZE - 24) / 2,
+                  width:    TIMER_SIZE - 20,
+                  height:   TIMER_SIZE - 20,
+                  borderRadius: (TIMER_SIZE - 20) / 2,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.05)',
                 },
               ]}
             >
@@ -338,7 +338,7 @@ const s = StyleSheet.create({
     paddingBottom: SPACING.xxxl,
     alignItems: 'center',
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 900,
     alignSelf: 'center',
   },
 
@@ -381,7 +381,7 @@ const s = StyleSheet.create({
     position: 'absolute',
   },
 
-  timerFace: {
+  timerContent: {
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,

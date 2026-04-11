@@ -69,14 +69,18 @@ export default function PlannerScreen() {
   const [topics, setTopics]   = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isDesktop = width >= 1024;
-  const isTablet = width >= 768 && width < 1024;
+  const isDesktop = width >= 1200;
+  const isTablet = width >= 768 && width < 1200;
   const numCols = isDesktop ? 3 : isTablet ? 2 : 1;
-  const pad = isDesktop ? SPACING.xl : SPACING.lg; // Tightened
-  const gap = SPACING.md; // Denser
+  
+  const CONTENT_MAX_W = 1100;
+  const effectiveWidth = Math.min(width, CONTENT_MAX_W);
+  
+  const pad = isDesktop ? SPACING.xl : SPACING.lg;
+  const gap = SPACING.md;
   const cardW = numCols === 1
     ? '100%'
-    : (width - pad * 2 - gap * (numCols - 1)) / numCols;
+    : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
 
   useEffect(() => {
     if (!userId) return;
@@ -244,8 +248,11 @@ export default function PlannerScreen() {
       {/* Background Atmosphere - Obsidians */}
       <View style={[s.blob, s.blob1, { opacity: 0.02 }]} />
       
-      <ScrollView
-        contentContainerStyle={[s.scroll, { paddingHorizontal: pad }]}
+      <ScrollView 
+        contentContainerStyle={[
+          s.scroll, 
+          { paddingHorizontal: pad, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' }
+        ]} 
         showsVerticalScrollIndicator={false}
       >
         <View style={s.header}>
