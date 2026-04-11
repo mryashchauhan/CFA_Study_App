@@ -42,15 +42,16 @@ async function seedTopics(uid: string, exam: ExamType) {
   try {
     const sections = SYLLABUS[exam];
     if (!sections) return;
+    const lods: Topic['lod'][] = ['Easy', 'Medium', 'Hard'];
     const rows = Object.entries(sections).flatMap(([section, topics]) =>
-      topics.map(topic => ({
+      topics.map((topic, idx) => ({
         user_id: uid,
         exam,
         section,
         topic,
         questionsSolved: 0,
         totalQuestions: 50,
-        lod: 'Medium' as const,
+        lod: lods[(idx + section.length) % 3], // Pseudo-random for visual variety without pure random instability
       })),
     );
     await supabase.from('topics').upsert(rows, {
@@ -353,11 +354,7 @@ export default function PlannerScreen() {
             <View key={sec} style={{ marginBottom: SPACING.xl }}>
               <View style={[s.secHead, { justifyContent: 'space-between' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[TYPOGRAPHY.sectionTitle, { fontSize: 20, fontWeight: '800', color: C.white }]}>{pretty(sec)}</Text>
-                </View>
-                
-                <View style={[s.lodBadge, { backgroundColor: 'rgba(234, 179, 8, 0.12)', borderColor: 'rgba(234, 179, 8, 0.2)', borderWidth: 1 }]}>
-                  <Text style={[s.lodTxt, { color: C.warning, fontSize: 10 }]}>{rows[0]?.lod?.toUpperCase() || 'MEDIUM'}</Text>
+                  <Text style={[TYPOGRAPHY.sectionTitle, { fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.7)' }]}>{pretty(sec)}</Text>
                 </View>
               </View>
 
@@ -369,15 +366,15 @@ export default function PlannerScreen() {
                   const hard = t.lod === 'Hard';
                   const easy = t.lod === 'Easy';
                   
-                  let lodColor: string = C.warning;
-                  let lodBg = 'rgba(245, 158, 11, 0.05)';
+                  let lodColor: string = 'rgba(234, 179, 8, 0.5)';
+                  let lodBg = 'rgba(234, 179, 8, 0.04)';
                   
                   if (hard) {
-                    lodColor = C.accentRed;
-                    lodBg = 'rgba(239, 68, 68, 0.08)';
+                    lodColor = 'rgba(239, 68, 68, 0.5)';
+                    lodBg = 'rgba(239, 68, 68, 0.04)';
                   } else if (easy) {
-                    lodColor = C.success;
-                    lodBg = 'rgba(16, 185, 129, 0.08)';
+                    lodColor = 'rgba(16, 185, 129, 0.5)';
+                    lodBg = 'rgba(16, 185, 129, 0.04)';
                   }
                   
                   return (
@@ -438,13 +435,13 @@ const s = StyleSheet.create({
   },
   blob1: { top: -100, left: -100, backgroundColor: C.accentIndigo },
 
-  scroll: { paddingTop: SPACING.xl, paddingBottom: SPACING.xxxl },
+  scroll: { paddingTop: 12, paddingBottom: SPACING.xxxl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   
-  header: { marginBottom: SPACING.lg, paddingHorizontal: SPACING.xs },
+  header: { marginBottom: 8, paddingHorizontal: SPACING.xs },
   subtitle: { ...TYPOGRAPHY.body, fontSize: 13, marginTop: 4, opacity: 0.5 },
   
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.xl },
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
   examPill: {
     paddingHorizontal: 16,
     paddingVertical: 10,
@@ -544,8 +541,8 @@ const s = StyleSheet.create({
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.04)',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
   },
   topicHead: {
     flexDirection: 'row',
@@ -556,7 +553,7 @@ const s = StyleSheet.create({
   topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
   lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  topicName: { marginBottom: 4, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  topicName: { marginBottom: 2, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
   
   topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
