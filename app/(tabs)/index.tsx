@@ -328,12 +328,12 @@ export default function PlannerScreen() {
 
           <View style={s.pacingWrap}>
              <Text style={s.pacing}>
-               Required Pace: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
+               Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
              </Text>
           </View>
 
-          <View style={s.barContainer}>
-            <View style={s.barBgHero}>
+          <View style={[s.barContainer, { flexDirection: 'row', alignItems: 'center' }]}>
+            <View style={[s.barBgHero, { flex: 1, marginRight: 12 }]}>
               <LinearGradient
                 colors={GRADIENTS.premiumCTA}
                 start={{ x: 0, y: 0 }}
@@ -341,7 +341,7 @@ export default function PlannerScreen() {
                 style={[s.barFillHero, { width: `${pct}%` }]}
               />
             </View>
-            <Text style={s.pctTxt}>{pct}% Mastery</Text>
+            <Text style={[s.pctTxt, { marginTop: 0 }]}>{pct}%</Text>
           </View>
         </View>
 
@@ -392,18 +392,13 @@ export default function PlannerScreen() {
                            </Pressable>
                          </View>
 
-                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 28 : 22 }]} numberOfLines={2}>
+                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
                            {t.topic}
                          </Text>
 
-                         <View style={s.topicStatLine}>
-                            <Text style={[s.progValue, { fontSize: isDesktop ? 36 : 28 }]}>{prog}%</Text>
-                            <Text style={[s.solvedSplit, { fontSize: isDesktop ? 16 : 14 }]}>{t.questionsSolved} / {t.totalQuestions}</Text>
-                         </View>
-                         
-                         <View style={s.miniBarBg}>
-                            <View style={[s.miniBarFill, { width: `${prog}%`, backgroundColor: hard ? C.accentRed : C.accentIndigo }]} />
-                         </View>
+                         <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
+                            {prog}% • {t.questionsSolved}/{t.totalQuestions}
+                         </Text>
 
                          <View style={s.glassStrip}>
                             <Pressable
