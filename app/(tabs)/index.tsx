@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, useWindowDimensions, ActivityIndicator, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Award, Clock, Plus, Minus, Zap } from 'lucide-react-native';
+import { Award, Clock, Plus, Minus, Zap, ShieldAlert, Target } from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
-import { C, SYLLABUS, EXAM_LIST, EXAM_DATES, ExamType, pretty, SHADOWS } from '@/constants/theme';
+import { C, SPACING, TYPOGRAPHY, SYLLABUS, EXAM_LIST, EXAM_DATES, ExamType, pretty, SHADOWS, R } from '@/constants/theme';
 
 const TARGETS: Record<string, number> = {
   'Ethical and Professional Standards': 180, 'Financial Statement Analysis': 156, 'Equity Investments': 156,
@@ -65,15 +65,27 @@ export default function PlannerScreen() {
     }).sort((a, b) => b.prio - a.prio);
   }, [topics, selectedExam]);
 
-  if (!authReady || loading) return <View style={s.center}><ActivityIndicator color={C.accentCyan} /></View>;
+  const stats = useMemo(() => {
+    const solved = topics.reduce((s, t) => s + (t.questionsSolved || 0), 0);
+    const correct = topics.reduce((s, t) => s + (t.questions_correct || 0), 0);
+    const acc = solved > 0 ? (correct / solved * 100).toFixed(1) : "0.0";
+    const days = Math.max(1, Math.ceil((new Date(EXAM_DATES[selectedExam] || Date.now()).getTime() - Date.now()) / 86400000));
+    return { acc, pace: ((1500 - solved) / days).toFixed(1), days };
+  }, [topics, selectedExam]);
+
+  if (!authReady || loading) return <View style={s.center}><ActivityIndicator color={C.accentCyan} size="large" /></View>;
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#05070A', '#0D0F14']} style={StyleSheet.absoluteFillObject} />
-      <ScrollView contentContainerStyle={s.scroll}>
+      <LinearGradient colors={['#000', '#090B0F', '#11141B']} style={StyleSheet.absoluteFillObject} />
+      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
         <View style={s.container}>
+          
           <View style={s.header}>
-            <Text style={s.mainTitle}>Command Center</Text>
+            <View>
+              <Text style={s.mainTitle}>Command Center</Text>
+              <Text style={s.subTitle}>High-Fidelity Study Engine</Text>
+            </View>
             <View style={s.pillRow}>
               {EXAM_LIST.map(e => (
                 <Pressable key={e} onPress={() => setSelectedExam(e)} style={[s.pill, e === selectedExam && s.pillOn]}>
@@ -83,35 +95,62 @@ export default function PlannerScreen() {
             </View>
           </View>
 
-          <View style={s.heroCard}>
+          <View style={[s.heroCard, SHADOWS.shadowGlass]}>
             <View style={s.heroStats}>
-              <View style={s.statBox}><Text style={s.statLabel}>ACCURACY</Text><Text style={s.statValue}>{processed.length ? (processed.reduce((a,b)=>a+(b.questions_correct),0)/Math.max(1,processed.reduce((a,b)=>a+b.questionsSolved,0))*100).toFixed(1) : 0}%</Text></View>
-              <View style={s.statBox}><Text style={s.statLabel}>DAYS LEFT</Text><Text style={s.statValue}>{Math.max(1, Math.ceil((new Date(EXAM_DATES[selectedExam] || Date.now()).getTime() - Date.now()) / 86400000))}</Text></View>
+              <View style={s.statBox}><Text style={s.statLabel}>OVERALL ACCURACY</Text><Text style={s.statValue}>{stats.acc}%</Text></View>
+              <View style={s.statBox}><Text style={s.statLabel}>DAILY PACE</Text><Text style={s.statValue}>{stats.pace}</Text></View>
+              <View style={s.statBox}><Text style={s.statLabel}>DAYS REMAINING</Text><Text style={s.statValue}>{stats.days}</Text></View>
             </View>
           </View>
 
           <View style={s.grid}>
-            {processed.map(t => (
-              <View key={t.id} style={[s.card, { width: isDesktop ? '31.5%' : '100%' }]}>
-                <View style={s.cardHead}>
-                  <Text style={s.cardMeta}>{pretty(t.section).toUpperCase()}</Text>
-                  <Pressable onPress={() => cycleLOD(t.id, t.lod)} style={s.lodBadge}><Text style={s.lodTxt}>{t.lod}</Text></Pressable>
+            {processed.map(t => {
+              const needsReview = t.acc < 70 && t.questionsSolved > 0;
+              return (
+                <View key={t.id} style={[s.card, { width: isDesktop ? '31.5%' : '100%' }, needsReview && s.dangerCard]}>
+                  <View style={s.cardHead}>
+                    <Text style={s.cardMeta}>{pretty(t.section).toUpperCase()} ({t.topic_weight}%)</Text>
+                    <Pressable onPress={() => cycleLOD(t.id, t.lod)} style={s.lodBadge}>
+                      <Zap size={10} color={C.accentCyan} style={{marginRight: 4}} />
+                      <Text style={s.lodTxt}>{t.lod.toUpperCase()}</Text>
+                    </Pressable>
+                  </View>
+
+                  <Text style={s.cardTitle} numberOfLines={2}>{t.topic}</Text>
+                  
+                  <View style={s.diagStrip}>
+                    <View style={s.diagItem}>
+                      <Award size={14} color={t.acc >= 70 ? C.success : C.accentRed} />
+                      <Text style={[s.diagTxt, { color: t.acc >= 70 ? C.success : C.accentRed }]}>{t.acc.toFixed(1)}%</Text>
+                    </View>
+                    <View style={s.diagItem}>
+                      <Clock size={14} color="rgba(255,255,255,0.4)" />
+                      <Text style={s.diagTxt}>{t.avg_time_per_question}s/Q</Text>
+                    </View>
+                  </View>
+
+                  <View style={s.progressSection}>
+                    <View style={s.progLabelRow}>
+                       <Text style={s.progTxt}>{t.questionsSolved} / {t.target} Questions</Text>
+                       {needsReview && <ShieldAlert size={12} color={C.accentRed} />}
+                    </View>
+                    <View style={s.barBg}><View style={[s.barFill, { width: `${Math.min(100, (t.questionsSolved / t.target) * 100)}%` }]} /></View>
+                  </View>
+
+                  <View style={s.controlStrip}>
+                    <Pressable onPress={() => bump(t.id, -1, t.questionsSolved, t.target)} style={s.stepBtn}>
+                      <Minus size={18} color="rgba(255,255,255,0.5)" />
+                    </Pressable>
+                    <View style={s.countDisplay}>
+                       <Text style={s.countVal}>{t.questionsSolved}</Text>
+                    </View>
+                    <Pressable onPress={() => bump(t.id, 1, t.questionsSolved, t.target)} style={s.stepBtn}>
+                      <Plus size={18} color={C.white} />
+                    </Pressable>
+                  </View>
                 </View>
-                <Text style={s.cardTitle} numberOfLines={2}>{t.topic}</Text>
-                <View style={s.diagRow}>
-                  <Award size={14} color={t.acc >= 70 ? C.success : C.accentRed} /><Text style={[s.diagTxt, { color: t.acc >= 70 ? C.success : C.accentRed }]}>{t.acc.toFixed(1)}%</Text>
-                  <Clock size={14} color="#666" /><Text style={s.diagTxt}>{t.avg_time_per_question}s/Q</Text>
-                </View>
-                <View style={s.progRow}><Text style={s.progTxt}>{t.questionsSolved} / {t.target} Qs</Text></View>
-                <View style={s.barBg}><View style={[s.barFill, { width: `${Math.min(100, (t.questionsSolved / t.target) * 100)}%` }]} /></View>
-                
-                <View style={s.controls}>
-                  <Pressable onPress={() => bump(t.id, -1, t.questionsSolved, t.target)} style={s.btn}><Minus size={18} color="#FFF" /></Pressable>
-                  <Text style={s.count}>{t.questionsSolved}</Text>
-                  <Pressable onPress={() => bump(t.id, 1, t.questionsSolved, t.target)} style={s.btn}><Plus size={18} color="#FFF" /></Pressable>
-                </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
       </ScrollView>
@@ -124,32 +163,37 @@ const s = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { paddingTop: 60, paddingBottom: 120 },
   container: { width: '100%', maxWidth: 1240, alignSelf: 'center', paddingHorizontal: 30 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 40 },
-  mainTitle: { color: '#FFF', fontSize: 28, fontWeight: '900' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 },
+  mainTitle: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  subTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '600', marginTop: 4 },
   pillRow: { flexDirection: 'row', gap: 10 },
-  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 10, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
+  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   pillOn: { borderColor: C.accentCyan, backgroundColor: 'rgba(0,217,245,0.1)' },
-  pillTxt: { color: '#444', fontSize: 12, fontWeight: '800' },
+  pillTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '800' },
   pillTxtOn: { color: '#FFF' },
-  heroCard: { backgroundColor: '#11141B', borderRadius: 24, padding: 30, marginBottom: 40, borderWidth: 1, borderColor: '#222' },
-  heroStats: { flexDirection: 'row', gap: 40 },
+  heroCard: { backgroundColor: '#11141B', borderRadius: 28, padding: 35, marginBottom: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
+  heroStats: { flexDirection: 'row', justifyContent: 'space-between' },
   statBox: { flex: 1 },
-  statLabel: { color: '#444', fontSize: 10, fontWeight: '900', marginBottom: 5 },
-  statValue: { color: '#FFF', fontSize: 32, fontWeight: '900' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
-  card: { backgroundColor: '#161A22', borderRadius: 24, padding: 24, borderWidth: 1, borderColor: '#222' },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  cardMeta: { color: '#444', fontSize: 10, fontWeight: '900' },
-  lodBadge: { backgroundColor: '#222', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
-  lodTxt: { color: C.accentCyan, fontSize: 9, fontWeight: '900' },
-  cardTitle: { color: '#FFF', fontSize: 19, fontWeight: '800', height: 55, lineHeight: 26 },
-  diagRow: { flexDirection: 'row', gap: 12, marginVertical: 15, alignItems: 'center' },
+  statLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', marginBottom: 6 },
+  statValue: { color: '#FFF', fontSize: 38, fontWeight: '900', letterSpacing: -1 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+  card: { backgroundColor: '#161A22', borderRadius: 24, padding: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  dangerCard: { borderColor: 'rgba(255,59,48,0.2)', backgroundColor: '#1C1616' },
+  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  cardMeta: { color: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: '900' },
+  lodBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  lodTxt: { color: C.accentCyan, fontSize: 10, fontWeight: '900' },
+  cardTitle: { color: '#FFF', fontSize: 20, fontWeight: '800', height: 60, lineHeight: 28 },
+  diagStrip: { flexDirection: 'row', gap: 15, marginVertical: 20 },
+  diagItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   diagTxt: { fontSize: 13, fontWeight: '700', color: '#FFF' },
-  progRow: { marginBottom: 8 },
-  progTxt: { color: '#444', fontSize: 11, fontWeight: '700' },
-  barBg: { height: 4, backgroundColor: '#111', borderRadius: 2, overflow: 'hidden', marginBottom: 20 },
-  barFill: { height: '100%', backgroundColor: C.accentCyan },
-  controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#000', padding: 8, borderRadius: 12, borderWidth: 1, borderColor: '#222' },
-  btn: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#111', alignItems: 'center', justifyContent: 'center' },
-  count: { color: '#FFF', fontSize: 18, fontWeight: '900' }
+  progressSection: { marginTop: 10, marginBottom: 25 },
+  progLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  progTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' },
+  barBg: { height: 6, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 3, overflow: 'hidden' },
+  barFill: { height: '100%', backgroundColor: C.accentCyan, borderRadius: 3 },
+  controlStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 16, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
+  stepBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  countDisplay: { flex: 1, alignItems: 'center' },
+  countVal: { color: '#FFF', fontSize: 20, fontWeight: '900' }
 });
