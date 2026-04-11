@@ -233,7 +233,7 @@ export default function PlannerScreen() {
               >
                 <View style={s.heroMainContent}>
                   <Text style={s.heroCategory}>{selectedExam} MASTER CLASS</Text>
-                  <Text style={s.heroHeading}>
+                  <Text style={[s.heroHeading, { fontSize: isDesktop ? 42 : 32, lineHeight: isDesktop ? 50 : 40 }]}>
                     {selectedExam === 'CFA'
                       ? 'Investment Analysis Mastery'
                       : 'Analytical Intelligence'}
@@ -484,10 +484,8 @@ const s = StyleSheet.create({
   heroCategory: { color: C.accentCyan, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
   heroHeading: {
     color: C.white,
-    fontSize: isDesktop ? 42 : 32,
     fontWeight: '900',
     marginTop: 12,
-    lineHeight: isDesktop ? 50 : 40,
   },
   heroSub: { color: 'rgba(255,255,255,0.4)', fontSize: 16, marginTop: 12, maxWidth: 450 },
   heroStatsRow: { flexDirection: 'row', gap: 16, marginTop: 24 },
