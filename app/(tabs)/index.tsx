@@ -1,23 +1,72 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions, ActivityIndicator, Pressable } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  useWindowDimensions,
+  ActivityIndicator,
+  Pressable,
+  Platform,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Award, Clock, Plus, Minus, Zap, ShieldAlert, Target } from 'lucide-react-native';
+import {
+  Award,
+  Clock,
+  Plus,
+  Minus,
+  Zap,
+  LayoutDashboard,
+  Target,
+  Calendar,
+  Layers,
+  Search,
+  Bell,
+  ChevronRight,
+} from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
-import { C, SPACING, TYPOGRAPHY, SYLLABUS, EXAM_LIST, EXAM_DATES, ExamType, pretty, SHADOWS, R } from '@/constants/theme';
+import {
+  C,
+  SPACING,
+  TYPOGRAPHY,
+  SYLLABUS,
+  EXAM_LIST,
+  EXAM_DATES,
+  ExamType,
+  pretty,
+  SHADOWS,
+  R,
+  glow,
+} from '@/constants/theme';
 
 const TARGETS: Record<string, number> = {
-  'Ethical and Professional Standards': 180, 'Financial Statement Analysis': 156, 'Equity Investments': 156,
-  'Fixed Income': 156, 'Quantitative Methods': 102, 'Economics': 102, 'Corporate Issuers': 102,
-  'Portfolio Management': 60, 'Derivatives': 60, 'Alternative Investments': 60
+  'Ethical and Professional Standards': 180,
+  'Financial Statement Analysis': 156,
+  'Equity Investments': 156,
+  'Fixed Income': 156,
+  'Quantitative Methods': 102,
+  'Economics': 102,
+  'Corporate Issuers': 102,
+  'Portfolio Management': 60,
+  'Derivatives': 60,
+  'Alternative Investments': 60,
 };
 
 async function seedTopics(uid: string, exam: ExamType) {
-  const sections = SYLLABUS[exam]; if (!sections) return;
+  const sections = SYLLABUS[exam];
+  if (!sections) return;
   const rows = Object.entries(sections).flatMap(([section, data]) =>
     data.topics.map((topic) => ({
-      user_id: uid, exam, section, topic, questionsSolved: 0, questions_correct: 0,
-      topic_weight: data.weight || 0, avg_time_per_question: 0, lod: 'Medium'
+      user_id: uid,
+      exam,
+      section,
+      topic,
+      questionsSolved: 0,
+      questions_correct: 0,
+      topic_weight: data.weight || 0,
+      avg_time_per_question: 0,
+      lod: 'Medium',
     }))
   );
   await supabase.from('topics').upsert(rows, { onConflict: 'user_id,exam,section,topic' });
@@ -29,171 +78,534 @@ export default function PlannerScreen() {
   const [selectedExam, setSelectedExam] = useState<ExamType>('CFA');
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isDesktop = width > 768;
+
+  const isDesktop = width > 900;
+  const isTablet = width > 600;
 
   const loadData = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
-    let { data } = await supabase.from('topics').select('*').eq('user_id', userId).eq('exam', selectedExam);
+    let { data } = await supabase
+      .from('topics')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('exam', selectedExam);
+
     if (!data || data.length === 0) {
       await seedTopics(userId, selectedExam);
-      const { data: s } = await supabase.from('topics').select('*').eq('user_id', userId).eq('exam', selectedExam);
+      const { data: s } = await supabase
+        .from('topics')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('exam', selectedExam);
       data = s;
     }
-    setTopics(data || []); setLoading(false);
+    setTopics(data || []);
+    setLoading(false);
   }, [userId, selectedExam]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const bump = async (id: string, delta: number, current: number, target: number) => {
     const val = Math.max(0, Math.min(target, current + delta));
-    setTopics(prev => prev.map(t => t.id === id ? { ...t, questionsSolved: val } : t));
+    setTopics((prev) => prev.map((t) => (t.id === id ? { ...t, questionsSolved: val } : t)));
     await supabase.from('topics').update({ questionsSolved: val }).eq('id', id);
   };
 
-  const cycleLOD = async (id: string, current: string) => {
-    const next = current === 'Easy' ? 'Medium' : current === 'Medium' ? 'Hard' : 'Easy';
-    setTopics(prev => prev.map(t => t.id === id ? { ...t, lod: next } : t));
-    await supabase.from('topics').update({ lod: next }).eq('id', id);
+  const setDifficulty = async (id: string, level: string) => {
+    setTopics((prev) => prev.map((t) => (t.id === id ? { ...t, lod: level } : t)));
+    await supabase.from('topics').update({ lod: level }).eq('id', id);
   };
 
   const processed = useMemo(() => {
-    return topics.map(t => {
-      const target = (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
-      const acc = t.questionsSolved > 0 ? (t.questions_correct / t.questionsSolved) * 100 : 0;
-      return { ...t, acc, target, prio: (t.topic_weight || 0) * (1 - (acc / 100)) };
-    }).sort((a, b) => b.prio - a.prio);
+    return topics
+      .map((t) => {
+        const target = (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
+        const acc = t.questionsSolved > 0 ? (t.questions_correct / t.questionsSolved) * 100 : 0;
+        return { ...t, acc, target, prio: (t.topic_weight || 0) * (1 - acc / 100) };
+      })
+      .sort((a, b) => b.prio - a.prio);
   }, [topics, selectedExam]);
 
   const stats = useMemo(() => {
     const solved = topics.reduce((s, t) => s + (t.questionsSolved || 0), 0);
     const correct = topics.reduce((s, t) => s + (t.questions_correct || 0), 0);
-    const acc = solved > 0 ? (correct / solved * 100).toFixed(1) : "0.0";
-    const days = Math.max(1, Math.ceil((new Date(EXAM_DATES[selectedExam] || Date.now()).getTime() - Date.now()) / 86400000));
-    return { acc, pace: ((1500 - solved) / days).toFixed(1), days };
+    const acc = solved > 0 ? (correct / solved * 100).toFixed(1) : '0.0';
+    const days = Math.max(
+      1,
+      Math.ceil(
+        (new Date(EXAM_DATES[selectedExam] || Date.now()).getTime() - Date.now()) / 86400000
+      )
+    );
+    const totalTarget = topics.reduce((s, t) => {
+      const target = (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
+      return s + target;
+    }, 0);
+    const totalProg = totalTarget > 0 ? (solved / totalTarget) * 100 : 0;
+
+    return { acc, pace: ((1500 - solved) / days).toFixed(1), days, progress: totalProg };
   }, [topics, selectedExam]);
 
-  if (!authReady || loading) return <View style={s.center}><ActivityIndicator color={C.accentCyan} size="large" /></View>;
+  if (!authReady || loading)
+    return (
+      <View style={s.center}>
+        <ActivityIndicator color={C.accentCyan} size='large' />
+      </View>
+    );
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={['#000', '#090B0F', '#11141B']} style={StyleSheet.absoluteFillObject} />
-      <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <View style={s.container}>
-          
-          <View style={s.header}>
-            <View>
-              <Text style={s.mainTitle}>Command Center</Text>
-              <Text style={s.subTitle}>High-Fidelity Study Engine</Text>
+      <LinearGradient colors={['#05070A', '#0D0F14']} style={StyleSheet.absoluteFillObject} />
+
+      {/* Layout Container */}
+      <View style={s.layoutContainer}>
+        {/* Sidebar (Desktop Only) */}
+        {isDesktop && (
+          <View style={s.sidebar}>
+            <View style={s.sideLogo}>
+              <View style={s.logoCircle}>
+                <Layers size={20} color={C.accentCyan} />
+              </View>
             </View>
-            <View style={s.pillRow}>
-              {EXAM_LIST.map(e => (
-                <Pressable key={e} onPress={() => setSelectedExam(e)} style={[s.pill, e === selectedExam && s.pillOn]}>
-                  <Text style={[s.pillTxt, e === selectedExam && s.pillTxtOn]}>{e}</Text>
-                </Pressable>
-              ))}
+            <View style={s.sideNav}>
+              <Pressable style={s.sideItemActive}>
+                <LayoutDashboard size={24} color={C.accentCyan} />
+              </Pressable>
+              <Pressable style={s.sideItem}>
+                <Calendar size={24} color={C.textMuted} />
+              </Pressable>
+              <Pressable style={s.sideItem}>
+                <Target size={24} color={C.textMuted} />
+              </Pressable>
+              <Pressable style={s.sideItem}>
+                <Award size={24} color={C.textMuted} />
+              </Pressable>
             </View>
           </View>
+        )}
 
-          <View style={[s.heroCard, SHADOWS.shadowGlass]}>
-            <View style={s.heroStats}>
-              <View style={s.statBox}><Text style={s.statLabel}>OVERALL ACCURACY</Text><Text style={s.statValue}>{stats.acc}%</Text></View>
-              <View style={s.statBox}><Text style={s.statLabel}>DAILY PACE</Text><Text style={s.statValue}>{stats.pace}</Text></View>
-              <View style={s.statBox}><Text style={s.statLabel}>DAYS REMAINING</Text><Text style={s.statValue}>{stats.days}</Text></View>
+        {/* Main Content Area */}
+        <View style={s.mainContent}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            stickyHeaderIndices={[0]}
+          >
+            {/* Top Bar Switcher */}
+            <View style={s.topHeader}>
+              <View style={s.topSearchRow}>
+                <View>
+                  <Text style={s.greeting}>Welcome back,</Text>
+                  <Text style={s.mainTitle}>Overview</Text>
+                </View>
+                <View style={s.headerIcons}>
+                  <Pressable style={s.iconBtn}>
+                    <Search size={22} color={C.textMuted} />
+                  </Pressable>
+                  <Pressable style={s.iconBtn}>
+                    <Bell size={22} color={C.textMuted} />
+                  </Pressable>
+                </View>
+              </View>
+
+              <View style={s.pillRow}>
+                {EXAM_LIST.map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => setSelectedExam(e)}
+                    style={[s.pill, e === selectedExam && s.pillOn]}
+                  >
+                    <Text style={[s.pillTxt, e === selectedExam && s.pillTxtOn]}>{e}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
-          </View>
 
-          <View style={s.grid}>
-            {processed.map(t => {
-              const needsReview = t.acc < 70 && t.questionsSolved > 0;
-              return (
-                <View key={t.id} style={[s.card, { width: isDesktop ? '31.5%' : '100%' }, needsReview && s.dangerCard]}>
-                  <View style={s.cardHead}>
-                    <Text style={s.cardMeta}>{pretty(t.section).toUpperCase()} ({t.topic_weight}%)</Text>
-                    <Pressable onPress={() => cycleLOD(t.id, t.lod)} style={s.lodBadge}>
-                      <Zap size={10} color={C.accentCyan} style={{marginRight: 4}} />
-                      <Text style={s.lodTxt}>{t.lod.toUpperCase()}</Text>
-                    </Pressable>
+            {/* Dribbble Style Hero Card */}
+            <View style={s.heroWrapper}>
+              <LinearGradient
+                colors={['#1F2937', '#111827']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.heroCard}
+              >
+                <View style={s.heroMainContent}>
+                  <Text style={s.heroCategory}>{selectedExam} MASTER CLASS</Text>
+                  <Text style={s.heroHeading}>
+                    {selectedExam === 'CFA'
+                      ? 'Investment Analysis Mastery'
+                      : 'Analytical Intelligence'}
+                  </Text>
+                  <Text style={s.heroSub}>
+                    Focus on High-Priority topics to maximize your {stats.acc}% accuracy.
+                  </Text>
+
+                  <View style={s.heroStatsRow}>
+                    <View style={s.heroStatChip}>
+                      <Clock size={14} color={C.accentCyan} />
+                      <Text style={s.heroStatText}>{stats.days} days</Text>
+                    </View>
+                    <View style={s.heroStatChip}>
+                      <Layers size={14} color={C.accentCyan} />
+                      <Text style={s.heroStatText}>{topics.length} Sections</Text>
+                    </View>
                   </View>
 
-                  <Text style={s.cardTitle} numberOfLines={2}>{t.topic}</Text>
-                  
-                  <View style={s.diagStrip}>
-                    <View style={s.diagItem}>
-                      <Award size={14} color={t.acc >= 70 ? C.success : C.accentRed} />
-                      <Text style={[s.diagTxt, { color: t.acc >= 70 ? C.success : C.accentRed }]}>{t.acc.toFixed(1)}%</Text>
+                  <View style={s.heroProgressGroup}>
+                    <Text style={s.progValue}>{stats.progress.toFixed(0)}% Overall</Text>
+                    <View style={s.heroPaceRow}>
+                      <Text style={s.paceLabel}>PACE: {stats.pace} Qs/Day</Text>
                     </View>
-                    <View style={s.diagItem}>
-                      <Clock size={14} color="rgba(255,255,255,0.4)" />
-                      <Text style={s.diagTxt}>{t.avg_time_per_question}s/Q</Text>
-                    </View>
-                  </View>
-
-                  <View style={s.progressSection}>
-                    <View style={s.progLabelRow}>
-                       <Text style={s.progTxt}>{t.questionsSolved} / {t.target} Questions</Text>
-                       {needsReview && <ShieldAlert size={12} color={C.accentRed} />}
-                    </View>
-                    <View style={s.barBg}><View style={[s.barFill, { width: `${Math.min(100, (t.questionsSolved / t.target) * 100)}%` }]} /></View>
-                  </View>
-
-                  <View style={s.controlStrip}>
-                    <Pressable onPress={() => bump(t.id, -1, t.questionsSolved, t.target)} style={s.stepBtn}>
-                      <Minus size={18} color="rgba(255,255,255,0.5)" />
-                    </Pressable>
-                    <View style={s.countDisplay}>
-                       <Text style={s.countVal}>{t.questionsSolved}</Text>
-                    </View>
-                    <Pressable onPress={() => bump(t.id, 1, t.questionsSolved, t.target)} style={s.stepBtn}>
-                      <Plus size={18} color={C.white} />
-                    </Pressable>
                   </View>
                 </View>
-              );
-            })}
-          </View>
+
+                {/* Accent Glow */}
+                <View style={[s.heroGlow, { backgroundColor: C.accentIndigo }]} />
+              </LinearGradient>
+            </View>
+
+            {/* Topics Section */}
+            <View style={s.syllabusSection}>
+              <View style={s.sectionHeader}>
+                <Text style={s.sectionTitle}>Syllabus Priority</Text>
+                <Pressable>
+                  <Text style={s.viewAll}>View all</Text>
+                </Pressable>
+              </View>
+
+              <View style={s.topicsGrid}>
+                {processed.map((t) => {
+                  const needsReview = t.acc < 70 && t.questionsSolved > 0;
+                  return (
+                    <View
+                      key={t.id}
+                      style={[
+                        s.topicCard,
+                        { width: isDesktop ? '31.5%' : isTablet ? '48%' : '100%' },
+                      ]}
+                    >
+                      <View style={s.cardTop}>
+                        <View
+                          style={[
+                            s.iconSquare,
+                            { backgroundColor: needsReview ? C.accentRedSoft : C.accentBlueSoft },
+                          ]}
+                        >
+                          <Zap size={20} color={needsReview ? C.accentRed : C.accentCyan} />
+                        </View>
+
+                        {/* DIFFICULTY SELECTOR */}
+                        <View style={s.difficultyPicker}>
+                          {['E', 'M', 'H'].map((lvl) => {
+                            const map = { E: 'Easy', M: 'Medium', H: 'Hard' };
+                            const active = t.lod === map[lvl as keyof typeof map];
+                            return (
+                              <Pressable
+                                key={lvl}
+                                onPress={() => setDifficulty(t.id, map[lvl as keyof typeof map])}
+                                style={[s.diffPill, active && s.diffPillOn]}
+                              >
+                                <Text style={[s.diffTxt, active && s.diffTxtOn]}>{lvl}</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+
+                      <Text style={s.topicTitle} numberOfLines={2}>
+                        {t.topic}
+                      </Text>
+                      <Text style={s.topicMeta}>{pretty(t.section)}</Text>
+
+                      <View style={s.cardBody}>
+                        <View style={s.cardStatRow}>
+                          <View style={s.cardStat}>
+                            <Award size={14} color={t.acc >= 70 ? C.success : C.accentRed} />
+                            <Text
+                              style={[
+                                s.cardStatVal,
+                                { color: t.acc >= 70 ? C.success : C.accentRed },
+                              ]}
+                            >
+                              {t.acc.toFixed(0)}%
+                            </Text>
+                          </View>
+                          <View style={s.cardStat}>
+                            <Target size={14} color={C.textMuted} />
+                            <Text style={s.cardStatVal}>{t.topic_weight}%</Text>
+                          </View>
+                        </View>
+
+                        <View style={s.progressRow}>
+                          <View style={s.miniBarBg}>
+                            <View
+                              style={[
+                                s.miniBarFill,
+                                {
+                                  width: `${Math.min(100, (t.questionsSolved / t.target) * 100)}%`,
+                                  backgroundColor: needsReview ? C.accentRed : C.accentCyan,
+                                },
+                              ]}
+                            />
+                          </View>
+                          <Text style={s.countLabel}>
+                            {t.questionsSolved}/{t.target}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* TACTILE CONTROLS */}
+                      <View style={s.tactileControls}>
+                        <Pressable
+                          onPress={() => bump(t.id, -1, t.questionsSolved, t.target)}
+                          style={s.tactileBtn}
+                        >
+                          <Minus size={18} color={C.textMuted} />
+                        </Pressable>
+                        <Text style={s.tactileVal}>{t.questionsSolved}</Text>
+                        <Pressable
+                          onPress={() => bump(t.id, 1, t.questionsSolved, t.target)}
+                          style={s.tactileBtn}
+                        >
+                          <Plus size={18} color={C.white} />
+                        </Pressable>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
         </View>
-      </ScrollView>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#000' },
+  root: { flex: 1, backgroundColor: '#05070A' },
+  layoutContainer: { flex: 1, flexDirection: 'row' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  scroll: { paddingTop: 60, paddingBottom: 120 },
-  container: { width: '100%', maxWidth: 1240, alignSelf: 'center', paddingHorizontal: 30 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 40 },
-  mainTitle: { color: '#FFF', fontSize: 32, fontWeight: '900', letterSpacing: -1 },
-  subTitle: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '600', marginTop: 4 },
-  pillRow: { flexDirection: 'row', gap: 10 },
-  pill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
-  pillOn: { borderColor: C.accentCyan, backgroundColor: 'rgba(0,217,245,0.1)' },
-  pillTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '800' },
-  pillTxtOn: { color: '#FFF' },
-  heroCard: { backgroundColor: '#11141B', borderRadius: 28, padding: 35, marginBottom: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' },
-  heroStats: { flexDirection: 'row', justifyContent: 'space-between' },
-  statBox: { flex: 1 },
-  statLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900', marginBottom: 6 },
-  statValue: { color: '#FFF', fontSize: 38, fontWeight: '900', letterSpacing: -1 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
-  card: { backgroundColor: '#161A22', borderRadius: 24, padding: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  dangerCard: { borderColor: 'rgba(255,59,48,0.2)', backgroundColor: '#1C1616' },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  cardMeta: { color: 'rgba(255,255,255,0.2)', fontSize: 10, fontWeight: '900' },
-  lodBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  lodTxt: { color: C.accentCyan, fontSize: 10, fontWeight: '900' },
-  cardTitle: { color: '#FFF', fontSize: 20, fontWeight: '800', height: 60, lineHeight: 28 },
-  diagStrip: { flexDirection: 'row', gap: 15, marginVertical: 20 },
-  diagItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  diagTxt: { fontSize: 13, fontWeight: '700', color: '#FFF' },
-  progressSection: { marginTop: 10, marginBottom: 25 },
-  progLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  progTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '700' },
-  barBg: { height: 6, backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: 3, overflow: 'hidden' },
-  barFill: { height: '100%', backgroundColor: C.accentCyan, borderRadius: 3 },
-  controlStrip: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 16, padding: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
-  stepBtn: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.03)', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  countDisplay: { flex: 1, alignItems: 'center' },
-  countVal: { color: '#FFF', fontSize: 20, fontWeight: '900' }
+
+  /* Sidebar Styles */
+  sidebar: {
+    width: 80,
+    backgroundColor: '#0D111A',
+    borderRightWidth: 1,
+    borderRightColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  sideLogo: { marginBottom: 50 },
+  logoCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0, 242, 255, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(0, 242, 255, 0.2)',
+  },
+  sideNav: { gap: 30 },
+  sideItem: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  sideItemActive: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  /* Main Content Styles */
+  mainContent: { flex: 1 },
+  scroll: { paddingBottom: 100 },
+
+  topHeader: {
+    paddingHorizontal: SPACING.xl,
+    paddingTop: 40,
+    paddingBottom: 20,
+    backgroundColor: '#05070A',
+  },
+  topSearchRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  greeting: { color: C.textMuted, fontSize: 14, fontWeight: '500' },
+  mainTitle: { color: C.white, fontSize: 32, fontWeight: '900' },
+  headerIcons: { flexDirection: 'row', gap: 12 },
+  iconBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+
+  pillRow: { flexDirection: 'row', gap: 12 },
+  pill: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  pillOn: {
+    borderColor: C.accentCyan,
+    backgroundColor: 'rgba(0,242,255,0.05)',
+  },
+  pillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
+  pillTxtOn: { color: C.white },
+
+  /* Hero Card Styles */
+  heroWrapper: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: 40,
+  },
+  heroCard: {
+    borderRadius: 32,
+    padding: 40,
+    minHeight: 260,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    ...SHADOWS.shadowSoft,
+  },
+  heroMainContent: { flex: 1, zIndex: 10 },
+  heroCategory: { color: C.accentCyan, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  heroHeading: {
+    color: C.white,
+    fontSize: isDesktop ? 42 : 32,
+    fontWeight: '900',
+    marginTop: 12,
+    lineHeight: isDesktop ? 50 : 40,
+  },
+  heroSub: { color: 'rgba(255,255,255,0.4)', fontSize: 16, marginTop: 12, maxWidth: 450 },
+  heroStatsRow: { flexDirection: 'row', gap: 16, marginTop: 24 },
+  heroStatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  heroStatText: { color: C.white, fontSize: 14, fontWeight: '700' },
+  heroProgressGroup: { marginTop: 30 },
+  progValue: { color: C.white, fontSize: 24, fontWeight: '900' },
+  heroPaceRow: { marginTop: 8 },
+  paceLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
+  heroGlow: {
+    position: 'absolute',
+    right: -100,
+    top: -100,
+    width: 300,
+    height: 300,
+    borderRadius: 150,
+    opacity: 0.15,
+    ...glow(C.accentIndigo, 100),
+  },
+
+  /* Topics Grid */
+  syllabusSection: { paddingHorizontal: SPACING.xl },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  sectionTitle: { color: C.white, fontSize: 24, fontWeight: '900' },
+  viewAll: { color: C.accentCyan, fontSize: 14, fontWeight: '700' },
+  topicsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
+
+  /* Topic Card Styles */
+  topicCard: {
+    backgroundColor: '#111827',
+    borderRadius: 24,
+    padding: 24,
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.03)',
+  },
+  cardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  iconSquare: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  difficultyPicker: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 10,
+    padding: 3,
+    gap: 2,
+  },
+  diffPill: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  diffPillOn: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  diffTxt: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '900' },
+  diffTxtOn: { color: C.accentCyan },
+
+  topicTitle: { color: C.white, fontSize: 19, fontWeight: '800', lineHeight: 26 },
+  topicMeta: { color: 'rgba(255,255,255,0.3)', fontSize: 13, fontWeight: '600', marginTop: 4 },
+
+  cardBody: { marginVertical: 20 },
+  cardStatRow: { flexDirection: 'row', gap: 16, marginBottom: 16 },
+  cardStat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  cardStatVal: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
+
+  progressRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  miniBarBg: {
+    flex: 1,
+    height: 6,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  miniBarFill: { height: '100%', borderRadius: 3 },
+  countLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700', width: 45 },
+
+  tactileControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 6,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+  },
+  tactileBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tactileVal: { color: C.white, fontSize: 18, fontWeight: '900' },
 });
