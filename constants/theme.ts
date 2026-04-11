@@ -41,7 +41,7 @@ export const R = {
   xs: 12,
   sm: 16,
   md: 20,
-  lg: 24, // Sharper feel  xl: 32,
+  lg: 24,
   pill: 999,
 } as const;
 
@@ -93,9 +93,9 @@ export const SHADOWS = {
     elevation: 10,
   } as ViewStyle,
   glowRed: {
-    shadowColor: '#FF5147',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
+    shadowColor: '#FF3333',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
     shadowRadius: 20,
     elevation: 14,
   } as ViewStyle,
@@ -116,30 +116,30 @@ export function glow(color: string, radius: number): Record<string, any> {
 }
 
 /* ── Syllabus Data ────────────────────────────── */
-export const SYLLABUS: Record<string, Record<string, string[]>> = {
+export const SYLLABUS: Record<string, Record<string, { weight: number, topics: string[] }>> = {
   CFA: {
-    Ethical_Professional_Standards: ['Standards of Practice', 'Code of Ethics', 'GIPS'],
-    Quantitative_Methods:           ['Time Value of Money', 'Probability', 'Regression'],
-    Economics:                      ['Microeconomics', 'Macroeconomics', 'Geopolitics'],
-    Corporate_Issuers:              ['Corporate Governance', 'Capital Structure', 'Business Models'],
-    Financial_Statement_Analysis:   ['Income Statements', 'Balance Sheets', 'Cash Flow Analysis'],
-    Equity_Investments:             ['Market Structure', 'Valuation Concepts', 'Industry Analysis'],
-    Fixed_Income:                   ['Bond Valuation', 'Yield Measures', 'Credit Analysis'],
-    Derivatives:                    ['Options', 'Forwards and Futures', 'Swaps'],
-    Alternative_Investments:        ['Real Estate', 'Private Equity', 'Hedge Funds'],
-    Portfolio_Management:           ['Risk and Return', 'Behavioral Finance', 'Technical Analysis'],
+    Ethical_Professional_Standards: { weight: 17.5, topics: ['Standards of Practice', 'Code of Ethics', 'GIPS'] },
+    Financial_Statement_Analysis:   { weight: 13, topics: ['Income Statements', 'Balance Sheets', 'Cash Flow Analysis'] },
+    Equity_Investments:             { weight: 13, topics: ['Market Structure', 'Valuation Concepts', 'Industry Analysis'] },
+    Fixed_Income:                   { weight: 13, topics: ['Bond Valuation', 'Yield Measures', 'Credit Analysis'] },
+    Quantitative_Methods:           { weight: 8.5, topics: ['Time Value of Money', 'Probability', 'Regression'] },
+    Economics:                      { weight: 8.5, topics: ['Microeconomics', 'Macroeconomics', 'Geopolitics'] },
+    Corporate_Issuers:              { weight: 8.5, topics: ['Corporate Governance', 'Capital Structure', 'Business Models'] },
+    Portfolio_Management:           { weight: 5, topics: ['Risk and Return', 'Behavioral Finance', 'Technical Analysis'] },
+    Derivatives:                    { weight: 5, topics: ['Options', 'Forwards and Futures', 'Swaps'] },
+    Alternative_Investments:        { weight: 5, topics: ['Real Estate', 'Private Equity', 'Hedge Funds'] },
   },
   ATMA: {
-    Analytical_Reasoning: ['Coding Decoding', 'Syllogism', 'Blood Relations', 'Arrangements', 'Data Sufficiency'],
-    Verbal_Skills:        ['Reading Comprehension', 'Grammar', 'Vocabulary', 'Para Jumbles'],
-    Quantitative_Skills:  ['Data Interpretation', 'Arithmetic', 'Algebra', 'Geometry', 'Modern Math'],
+    Analytical_Reasoning: { weight: 33.3, topics: ['Coding Decoding', 'Syllogism', 'Blood Relations', 'Arrangements', 'Data Sufficiency'] },
+    Verbal_Skills:        { weight: 33.3, topics: ['Reading Comprehension', 'Grammar', 'Vocabulary', 'Para Jumbles'] },
+    Quantitative_Skills:  { weight: 33.3, topics: ['Data Interpretation', 'Arithmetic', 'Algebra', 'Geometry', 'Modern Math'] },
   },
   MAT: {
-    Language_Comprehension:          ['Reading Comprehension', 'Sentence Correction', 'Idioms'],
-    Intelligence_Critical_Reasoning: ['Puzzles', 'Direction Sense', 'Critical Reasoning', 'Input Output'],
-    Mathematical_Skills:             ['Arithmetic', 'Number System', 'Mensuration', 'Probability'],
-    Data_Analysis_Sufficiency:       ['Pie Charts', 'Bar Graphs', 'Data Sufficiency', 'Venn Diagrams'],
-    Indian_Global_Environment:       ['Current Affairs', 'Indian Economy', 'Corporate News'],
+    Language_Comprehension:          { weight: 20, topics: ['Reading Comprehension', 'Sentence Correction', 'Idioms'] },
+    Intelligence_Critical_Reasoning: { weight: 20, topics: ['Puzzles', 'Direction Sense', 'Critical Reasoning', 'Input Output'] },
+    Mathematical_Skills:             { weight: 20, topics: ['Arithmetic', 'Number System', 'Mensuration', 'Probability'] },
+    Data_Analysis_Sufficiency:       { weight: 20, topics: ['Pie Charts', 'Bar Graphs', 'Data Sufficiency', 'Venn Diagrams'] },
+    Indian_Global_Environment:       { weight: 20, topics: ['Current Affairs', 'Indian Economy', 'Corporate News'] },
   },
 };
 

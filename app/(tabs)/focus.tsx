@@ -6,11 +6,12 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Platform,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Pause, RotateCcw } from 'lucide-react-native';
+import { Play, Pause, RotateCcw, Target, CheckCircle2, Award } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 import { useTimer } from '@/lib/TimerContext';
 import {
@@ -38,12 +39,16 @@ export default function FocusScreen() {
     topic,
     strictMode,
     recallText,
+    attemptedThisSession,
+    correctThisSession,
     setRatio,
     setExam,
     setSection,
     setTopic,
     setStrictMode,
     setRecallText,
+    setAttempted,
+    setCorrect,
     startTimer,
     pauseTimer,
     resetTimer,
@@ -67,42 +72,80 @@ export default function FocusScreen() {
     return (
       <View style={s.root}>
         <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
-        <View style={[s.blob, s.blob1, { opacity: 0.03 }]} />
-        
-        <ScrollView contentContainerStyle={s.recallWrap} keyboardShouldPersistTaps="handled">
-          <View style={[s.card, SHADOWS.shadowGlass]}>
-            <Text style={s.recallTitle}>Session Complete</Text>
-            <Text style={TYPOGRAPHY.body}>
-              Lock your learning with a quick summary
-            </Text>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
+        >
+          <ScrollView contentContainerStyle={s.recallWrap} keyboardShouldPersistTaps="handled">
+            <View style={[s.card, SHADOWS.shadowGlass, { padding: 32 }]}>
+              <View style={{ alignItems: 'center', marginBottom: 24 }}>
+                 <Award size={48} color={C.accentCyan} />
+                 <Text style={[s.recallTitle, { marginTop: 12 }]}>Session Complete</Text>
+                 <Text style={[TYPOGRAPHY.body, { opacity: 0.6, textAlign: 'center' }]}>
+                   Diagnostics & Retention Review
+                 </Text>
+              </View>
 
-            <TextInput
-              value={recallText}
-              onChangeText={setRecallText}
-              placeholder="What did you just master?"
-              placeholderTextColor={C.textMuted}
-              multiline
-              autoFocus
-              style={s.recallInput}
-            />
+              <View style={s.inputGroup}>
+                <Text style={s.inputLabel}>Session Summary</Text>
+                <TextInput
+                  value={recallText}
+                  onChangeText={setRecallText}
+                  placeholder="Key concepts mastered in this session..."
+                  placeholderTextColor={C.textMuted}
+                  multiline
+                  autoFocus
+                  style={s.recallInput}
+                />
+              </View>
 
-            <Pressable 
-              onPress={submitRecall} 
-              style={({ pressed }) => [s.bigBtnWrap, pressed && { opacity: 0.85 }]}
-            >
-              <LinearGradient
-                colors={GRADIENTS.cta}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={s.bigBtn}
+              <View style={s.perfRow}>
+                 <View style={s.perfCol}>
+                    <Text style={s.inputLabel}>Attempted</Text>
+                    <View style={s.numericWrap}>
+                       <Target size={18} color={C.textMuted} style={{ marginRight: 8 }} />
+                       <TextInput
+                          value={attemptedThisSession}
+                          onChangeText={setAttempted}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={C.textMuted}
+                          style={s.numericInput}
+                       />
+                    </View>
+                 </View>
+                 <View style={s.perfCol}>
+                    <Text style={s.inputLabel}>Correct</Text>
+                    <View style={s.numericWrap}>
+                       <CheckCircle2 size={18} color={C.success} style={{ marginRight: 8 }} />
+                       <TextInput
+                          value={correctThisSession}
+                          onChangeText={setCorrect}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          placeholderTextColor={C.textMuted}
+                          style={s.numericInput}
+                       />
+                    </View>
+                 </View>
+              </View>
+
+              <Pressable 
+                onPress={submitRecall} 
+                style={({ pressed }) => [s.bigBtnWrap, { marginTop: 32 }, pressed && { opacity: 0.85 }]}
               >
-                <Text style={TYPOGRAPHY.buttonText}>
-                  {recallText.length > 0 ? 'Save to Syllabus' : 'Finish Session'}
-                </Text>
-              </LinearGradient>
-            </Pressable>
-          </View>
-        </ScrollView>
+                <LinearGradient
+                  colors={GRADIENTS.cta}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={s.bigBtn}
+                >
+                  <Text style={TYPOGRAPHY.buttonText}>Log Session Performance</Text>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     );
   }
@@ -111,7 +154,7 @@ export default function FocusScreen() {
     <View style={s.root}>
       <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
       
-      {/* Background Atmosphere - Monochromatic & Subtle */}
+      {/* Background Atmosphere */}
       <View style={[s.blob, s.blob1, { opacity: 0.08, backgroundColor: C.accentCyan }]} />
       <View style={[s.blob, s.blob2, { opacity: 0.06, backgroundColor: C.accentIndigo }]} />
 
@@ -134,7 +177,6 @@ export default function FocusScreen() {
         </View>
 
         <View style={s.heroBlock}>
-          {/* Subtle Halo */}
           <View
             style={[
               s.heroAura,
@@ -304,7 +346,7 @@ export default function FocusScreen() {
 
           <Text style={s.subLabel}>Core Topic</Text>
           <View style={s.pillsWrap}>
-            {(SYLLABUS[exam]?.[section] ?? []).map(t => {
+            {(SYLLABUS[exam]?.[section]?.topics ?? []).map(t => {
               const on = t === topic;
               return (
                 <Pressable key={t} onPress={() => setTopic(t)} style={[s.pill, on && s.pillOnExam]}>
@@ -320,258 +362,61 @@ export default function FocusScreen() {
 }
 
 const s = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: C.primaryBG,
-  },
-  blob: {
-    position: 'absolute',
-    borderRadius: 9999,
-    width: 300,
-    height: 300,
-  },
+  root: { flex: 1, backgroundColor: C.primaryBG },
+  blob: { position: 'absolute', borderRadius: 9999, width: 300, height: 300 },
   blob1: { top: -50, left: -50, backgroundColor: C.accentIndigo },
   blob2: { bottom: -100, right: -100, backgroundColor: C.accentBlue },
-
-  scrollInner: {
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING.xxxl,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 900,
-    alignSelf: 'center',
+  scrollInner: { 
+    paddingTop: SPACING.xl, paddingBottom: SPACING.xxxl, alignItems: 'center', 
+    width: '100%', maxWidth: 900, alignSelf: 'center' 
   },
-
-  pathBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: R.xs,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    marginBottom: SPACING.xl,
+  pathBadge: { 
+    backgroundColor: 'rgba(255, 255, 255, 0.03)', borderWidth: 1, 
+    borderColor: 'rgba(255, 255, 255, 0.05)', borderRadius: R.xs, 
+    paddingHorizontal: 20, paddingVertical: 12, marginBottom: SPACING.xl 
   },
-
-  pathTxt: {
-    ...TYPOGRAPHY.meta,
-    fontSize: 13,
-    letterSpacing: 0.5,
-    color: C.accentBlue,
+  pathTxt: { ...TYPOGRAPHY.meta, fontSize: 13, letterSpacing: 0.5, color: C.accentBlue },
+  heroBlock: { alignItems: 'center', width: '100%', marginBottom: SPACING.xl },
+  heroAura: { position: 'absolute', top: -20, backgroundColor: 'rgba(99, 102, 241, 0.015)' },
+  timerWrap: { alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xl },
+  timerSvg: { position: 'absolute' },
+  timerContent: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.04)', backgroundColor: '#05070A' },
+  timerHighlight: { position: 'absolute', top: '3%', left: '8%', right: '8%', height: '25%', borderRadius: 999, backgroundColor: 'rgba(255, 255, 255, 0.015)', transform: [{ rotate: '-12deg' }] },
+  controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.md, marginTop: SPACING.md, width: '100%' },
+  mainActionWrap: { width: '100%', maxWidth: 200, borderRadius: R.sm, overflow: 'hidden', ...SHADOWS.shadowGlass },
+  mainActionGradient: { minHeight: 54, paddingHorizontal: 24, borderRadius: R.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  mainActionTxt: { ...TYPOGRAPHY.buttonText, fontSize: 16, letterSpacing: 2 },
+  secondaryActionBtn: { width: 54, height: 54, borderRadius: R.sm, backgroundColor: 'rgba(255, 255, 255, 0.02)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', alignItems: 'center', justifyContent: 'center' },
+  card: { width: '100%', backgroundColor: C.surface, borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.04)', padding: SPACING.lg, marginBottom: SPACING.md },
+  subLabel: { ...TYPOGRAPHY.meta, fontSize: 10, marginTop: SPACING.lg, marginBottom: SPACING.sm, opacity: 0.5 },
+  pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.xs },
+  pill: { minHeight: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: R.xs, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', backgroundColor: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' },
+  pillOn: { borderColor: C.accentIndigo },
+  pillTxt: { color: C.textMuted, fontSize: 14, fontWeight: '700' },
+  pillTxtOn: { color: C.white },
+  pillOnExam: { backgroundColor: 'rgba(56, 189, 248, 0.04)', borderColor: 'rgba(56, 189, 248, 0.2)' },
+  pillTxtOnExam: { color: C.accentBlue },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  track: { width: 48, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1, padding: 2, justifyContent: 'center' },
+  trackOn: { backgroundColor: C.accentIndigo },
+  thumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.textMuted },
+  thumbOn: { alignSelf: 'flex-end', backgroundColor: C.white },
+  recallWrap: { flexGrow: 1, justifyContent: 'center', padding: SPACING.xl },
+  recallTitle: { ...TYPOGRAPHY.cardTitle, color: C.textPrimary, marginBottom: SPACING.xs },
+  inputGroup: { width: '100%', marginBottom: 20 },
+  inputLabel: { ...TYPOGRAPHY.meta, fontSize: 10, color: C.accentCyan, marginBottom: 8 },
+  recallInput: { 
+    backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', 
+    borderRadius: R.md, padding: SPACING.lg, color: C.textPrimary, fontSize: 15, 
+    minHeight: 100, textAlignVertical: 'top' 
   },
-
-  heroBlock: {
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: SPACING.xl,
+  perfRow: { flexDirection: 'row', gap: 16, width: '100%' },
+  perfCol: { flex: 1 },
+  numericWrap: { 
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.4)', 
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', borderRadius: R.sm, paddingHorizontal: 12 
   },
-
-  heroAura: {
-    position: 'absolute',
-    top: -20,
-    backgroundColor: 'rgba(99, 102, 241, 0.015)',
-  },
-
-  timerWrap: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-  },
-
-  timerSvg: {
-    position: 'absolute',
-  },
-
-  timerContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    backgroundColor: '#05070A',
-  },
-
-  timerHighlight: {
-    position: 'absolute',
-    top: '3%',
-    left: '8%',
-    right: '8%',
-    height: '25%',
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.015)',
-    transform: [{ rotate: '-12deg' }],
-  },
-
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-    marginTop: SPACING.md,
-    width: '100%',
-  },
-
-  mainActionWrap: {
-    width: '100%',
-    maxWidth: 200,
-    borderRadius: R.sm,
-    overflow: 'hidden',
-    ...SHADOWS.shadowGlass,
-  },
-
-  mainActionGradient: {
-    minHeight: 54,
-    paddingHorizontal: 24,
-    borderRadius: R.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-
-  mainActionTxt: {
-    ...TYPOGRAPHY.buttonText,
-    fontSize: 16,
-    letterSpacing: 2,
-  },
-
-  secondaryActionBtn: {
-    width: 54,
-    height: 54,
-    borderRadius: R.sm,
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  card: {
-    width: '100%',
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-  },
-
-  subLabel: {
-    ...TYPOGRAPHY.meta,
-    fontSize: 10,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
-    opacity: 0.5,
-  },
-
-  pillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-    marginTop: SPACING.xs,
-  },
-
-  pill: {
-    minHeight: 40,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    borderRadius: R.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.05)',
-    backgroundColor: 'rgba(255, 255, 255, 0.01)',
-    overflow: 'hidden',
-  },
-
-  pillOn: {
-    borderColor: C.accentIndigo,
-  },
-
-  pillTxt: {
-    color: C.textMuted,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-
-  pillTxtOn: {
-    color: C.white,
-  },
-
-  pillOnExam: {
-    backgroundColor: 'rgba(56, 189, 248, 0.04)',
-    borderColor: 'rgba(56, 189, 248, 0.2)',
-  },
-
-  pillTxtOnExam: {
-    color: C.accentBlue,
-  },
-
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-
-  track: {
-    width: 48,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderWidth: 1,
-    padding: 2,
-    justifyContent: 'center',
-  },
-
-  trackOn: {
-    backgroundColor: C.accentIndigo,
-  },
-
-  thumb: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: C.textMuted,
-  },
-
-  thumbOn: {
-    alignSelf: 'flex-end',
-    backgroundColor: C.white,
-  },
-
-  recallWrap: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: SPACING.xl,
-  },
-
-  recallTitle: {
-    ...TYPOGRAPHY.cardTitle,
-    color: C.textPrimary,
-    marginBottom: SPACING.xs,
-  },
-
-  recallInput: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    borderRadius: R.md,
-    padding: SPACING.lg,
-    color: C.textPrimary,
-    fontSize: 15,
-    minHeight: 120,
-    textAlignVertical: 'top',
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.xl,
-  },
-
-  bigBtnWrap: {
-    borderRadius: R.sm,
-    overflow: 'hidden',
-    ...SHADOWS.shadowGlass,
-  },
-
-  bigBtn: {
-    minHeight: 54,
-    paddingHorizontal: SPACING.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  numericInput: { flex: 1, height: 48, color: C.white, fontSize: 18, fontWeight: '800' },
+  bigBtnWrap: { borderRadius: R.sm, overflow: 'hidden', ...SHADOWS.shadowGlass },
+  bigBtn: { minHeight: 56, paddingHorizontal: SPACING.xl, alignItems: 'center', justifyContent: 'center' },
 });

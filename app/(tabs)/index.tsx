@@ -9,12 +9,11 @@ import {
   Pressable,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Minus, Zap, RefreshCcw, WifiOff } from 'lucide-react-native';
+import { Plus, Minus, Zap, RefreshCcw, WifiOff, Award, Clock } from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
 import {
   C,
-  R,
   SPACING,
   TYPOGRAPHY,
   SYLLABUS,
@@ -22,7 +21,7 @@ import {
   EXAM_DATES,
   ExamType,
   pretty,
-  GRADIENTS,
+  SHADOWS,
 } from '@/constants/theme';
 
 interface Topic {
@@ -32,8 +31,18 @@ interface Topic {
   section: string;
   topic: string;
   questionsSolved: number;
+  questions_correct: number;
   totalQuestions: number;
   lod: 'Easy' | 'Medium' | 'Hard';
+  avg_time_per_question: number;
+  topic_weight: number;
+  revision_count: number;
+}
+
+interface CalculatedTopic extends Topic {
+  accuracy: number;
+  priority: number;
+  weight: number;
 }
 
 async function seedTopics(uid: string, exam: ExamType) {
@@ -41,15 +50,19 @@ async function seedTopics(uid: string, exam: ExamType) {
     const sections = SYLLABUS[exam];
     if (!sections) return;
     const lods: Topic['lod'][] = ['Easy', 'Medium', 'Hard'];
-    const rows = Object.entries(sections).flatMap(([section, topics]) =>
-      topics.map((topic, idx) => ({
+    const rows = Object.entries(sections).flatMap(([section, data]) =>
+      data.topics.map((topic, idx) => ({
         user_id: uid,
         exam,
         section,
         topic,
         questionsSolved: 0,
+        questions_correct: 0,
         totalQuestions: 50,
         lod: lods[(idx + section.length) % 3],
+        topic_weight: data.weight,
+        avg_time_per_question: 0,
+        revision_count: 0,
       })),
     );
     await supabase.from('topics').upsert(rows, {
@@ -71,11 +84,7 @@ export default function PlannerScreen() {
   // Luxury Glass Responsive Constraints
   const CONTENT_MAX_W = 1200;
   const isDesktopGrid = width > 768;
-  const numCols = isDesktopGrid ? 3 : 1;
   const cardGap = 24;
-  
-  // Padding for the root container
-  const rootPadding = width > 768 ? 32 : 16;
 
   useEffect(() => {
     if (!userId) return;
@@ -88,9 +97,7 @@ export default function PlannerScreen() {
           .from('topics')
           .select('*')
           .eq('user_id', userId)
-          .eq('exam', selectedExam)
-          .order('section')
-          .order('topic');
+          .eq('exam', selectedExam);
 
         if (!alive) return;
 
@@ -100,9 +107,7 @@ export default function PlannerScreen() {
             .from('topics')
             .select('*')
             .eq('user_id', userId)
-            .eq('exam', selectedExam)
-            .order('section')
-            .order('topic');
+            .eq('exam', selectedExam);
           if (alive) setTopics((seeded ?? []) as Topic[]);
         } else {
           setTopics(data as Topic[]);
@@ -177,12 +182,15 @@ export default function PlannerScreen() {
   const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
   const daily    = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day!'; 
-  const pct      = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
+  const totalPct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
-  const grouped: Record<string, Topic[]> = {};
-  topics.forEach(t => {
-    (grouped[t.section] ??= []).push(t);
-  });
+  // Intelligence Calculation & Sorting
+  const sortedTopics: CalculatedTopic[] = topics.map(t => {
+    const accuracy = (t.questions_correct / Math.max(t.questionsSolved, 1)) * 100;
+    const weight = SYLLABUS[t.exam]?.[t.section]?.weight ?? 0;
+    const priority = weight * (1 - (accuracy / 100));
+    return { ...t, accuracy, priority, weight };
+  }).sort((a,b) => b.priority - a.priority);
 
   if (!authReady) {
     return (
@@ -212,12 +220,11 @@ export default function PlannerScreen() {
         contentContainerStyle={s.scroll} 
         showsVerticalScrollIndicator={false}
       >
-        {/* Responsive Anchor 1200px Wrapper */}
         <View style={s.anchor}>
           
           <View style={s.header}>
             <Text style={[TYPOGRAPHY.screenTitleTablet, { fontSize: isDesktopGrid ? 56 : 38, fontWeight: '900', color: C.white }]}>Study Planner</Text>
-            <Text style={s.subtitle}>Management Cockpit</Text>
+            <Text style={s.subtitle}>Intelligence & Diagnostic Cockpit</Text>
           </View>
 
           <View style={s.pills}>
@@ -273,59 +280,70 @@ export default function PlannerScreen() {
                  <LinearGradient
                   colors={['#00D9F5', '#0072FF']}
                   start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                  style={[s.barFillHero, { width: `${pct}%` }]}
+                  style={[s.barFillHero, { width: `${totalPct}%` }]}
                  />
                </View>
-               <Text style={s.pctTxt}>{pct}% Mastery</Text>
+               <Text style={s.pctTxt}>{totalPct}% Overall Mastery</Text>
             </View>
           </View>
 
           {loading ? (
             <ActivityIndicator size="large" color={C.accentCyan} style={{ marginTop: 60 }} />
           ) : (
-            Object.entries(grouped).map(([sec, rows]) => (
-              <View key={sec} style={{ marginBottom: 40 }}>
-                <View style={s.secHead}>
-                  <Text style={s.sectionLabel}>{pretty(sec)}</Text>
-                </View>
-
-                <View style={[s.grid, { gap: cardGap }]}>
-                  {rows.map(t => {
-                    const prog = t.totalQuestions > 0 ? Math.round((t.questionsSolved / t.totalQuestions) * 100) : 0;
-                    return (
-                      <View key={t.id} style={[s.topicCardWrap, { width: isDesktopGrid ? '31%' : '100%' }]}>
-                         <View style={s.topicCard}>
-                            <View style={s.topicHead}>
-                               <Text style={s.topicMeta}>{pretty(t.section).toUpperCase()}</Text>
-                               <View style={s.lodBadge}>
-                                  <Text style={s.lodTxt}>{t.lod}</Text>
-                               </View>
-                            </View>
-
-                            <Text style={s.topicName} numberOfLines={2}>{t.topic}</Text>
-
-                            <Text style={s.solvedSplit}>
-                               {prog}% • {t.questionsSolved}/{t.totalQuestions}
-                            </Text>
-
-                            <View style={s.glassStrip}>
-                               <Pressable onPress={() => bump(t.id, -1)} style={s.stepBtn}>
-                                  <Minus size={20} color="rgba(255,255,255,0.6)" />
-                               </Pressable>
-                               
-                               <Text style={s.stepVal}>{t.questionsSolved}</Text>
-                               
-                               <Pressable onPress={() => bump(t.id, 1)} style={s.stepBtn}>
-                                  <Plus size={20} color={C.white} />
-                               </Pressable>
-                            </View>
-                         </View>
-                      </View>
-                    );
-                  })}
-                </View>
+            <View>
+              <View style={s.secHead}>
+                <Text style={s.sectionLabel}>Prioritized Syllabus (by Weight & Accuracy)</Text>
               </View>
-            ))
+
+              <View style={[s.grid, { gap: cardGap }]}>
+                {sortedTopics.map(t => {
+                  const needsReview = t.accuracy < 70 && t.questionsSolved > 0;
+                  return (
+                    <View key={t.id} style={[s.topicCardWrap, { width: isDesktopGrid ? '31%' : '100%' }]}>
+                       <View style={[s.topicCard, needsReview && s.topicCardWarning]}>
+                          <View style={s.topicHead}>
+                             <Text style={s.topicMeta}>{pretty(t.section).toUpperCase()} ({t.weight}%)</Text>
+                             <View style={s.lodBadge}>
+                                <Text style={s.lodTxt}>{t.lod}</Text>
+                             </View>
+                          </View>
+
+                          <Text style={s.topicName} numberOfLines={2}>{t.topic}</Text>
+
+                          <View style={s.diagnosticRow}>
+                             <View style={s.diagBox}>
+                                <Award size={14} color={t.accuracy >= 70 ? C.success : C.accentRed} />
+                                <Text style={[s.diagTxt, { color: t.accuracy >= 70 ? C.success : C.accentRed }]}>
+                                   {t.accuracy.toFixed(1)}% Acc
+                                </Text>
+                             </View>
+                             <View style={s.diagBox}>
+                                <Clock size={14} color={C.textMuted} />
+                                <Text style={s.diagTxt}>{t.avg_time_per_question.toFixed(0)}s/Q</Text>
+                             </View>
+                          </View>
+
+                          <Text style={s.solvedSplit}>
+                             Score: {t.questions_correct}/{t.questionsSolved} (Attempted)
+                          </Text>
+
+                          <View style={s.glassStrip}>
+                             <Pressable onPress={() => bump(t.id, -1)} style={s.stepBtn}>
+                                <Minus size={20} color="rgba(255,255,255,0.6)" />
+                             </Pressable>
+                             
+                             <Text style={s.stepVal}>{t.questionsSolved}</Text>
+                             
+                             <Pressable onPress={() => bump(t.id, 1)} style={s.stepBtn}>
+                                <Plus size={20} color={C.white} />
+                             </Pressable>
+                          </View>
+                       </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
           )}
         </View>
       </ScrollView>
@@ -408,8 +426,8 @@ const s = StyleSheet.create({
   barFillHero: { height: '100%', borderRadius: 4 },
   pctTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '700', marginTop: 10 },
 
-  secHead: { marginBottom: 12 },
-  sectionLabel: { fontSize: 20, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
+  secHead: { marginBottom: 16 },
+  sectionLabel: { fontSize: 22, fontWeight: '900', color: 'rgba(255,255,255,0.8)', letterSpacing: 0.5 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
   topicCardWrap: { marginBottom: 12 },
@@ -420,12 +438,35 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.08)',
   },
+  topicCardWarning: {
+    borderColor: 'rgba(255, 51, 51, 0.3)',
+    ...SHADOWS.glowRed,
+    shadowRadius: 10,
+    shadowOpacity: 0.2,
+  },
   topicHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   topicMeta: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800' },
   lodBadge: { backgroundColor: 'rgba(0,217,245,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
   lodTxt: { color: C.accentCyan, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
   topicName: { fontSize: 22, fontWeight: '800', color: C.white, lineHeight: 30 },
-  solvedSplit: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600', marginTop: 8 },
+  
+  diagnosticRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 12,
+  },
+  diagBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  diagTxt: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: C.textSecondary,
+  },
+
+  solvedSplit: { color: 'rgba(255,255,255,0.2)', fontSize: 13, fontWeight: '600', marginTop: 10 },
   
   glassStrip: {
     flexDirection: 'row',

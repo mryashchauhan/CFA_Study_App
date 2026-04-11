@@ -31,6 +31,8 @@ export interface TimerCtx {
   strictMode: boolean;
   /* active-recall gate */
   recallText: string;
+  attemptedThisSession: string;
+  correctThisSession: string;
   /* actions */
   setRatio:      (r: number)  => void;
   setExam:       (e: ExamType) => void;
@@ -38,10 +40,12 @@ export interface TimerCtx {
   setTopic:      (t: string)  => void;
   setStrictMode: (v: boolean) => void;
   setRecallText: (t: string)  => void;
+  setAttempted:  (t: string)  => void;
+  setCorrect:    (t: string)  => void;
   startTimer:    () => void;
   pauseTimer:    () => void;
   resetTimer:    () => void;
-  submitRecall:  () => void;
+  submitRecall:  () => Promise<void>;
   refreshAuth:   () => void;
 }
 
@@ -64,7 +68,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   /* ── timer state ──────────────────── */
   const defaultExam    = EXAM_LIST[0];
   const defaultSection = Object.keys(SYLLABUS[defaultExam])[0];
-  const defaultTopic   = SYLLABUS[defaultExam][defaultSection][0];
+  const defaultTopic   = SYLLABUS[defaultExam][defaultSection].topics[0];
 
   const [exam, setExamRaw]        = useState<ExamType>(defaultExam);
   const [section, setSectionRaw]  = useState(defaultSection);
@@ -75,6 +79,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [isFinished, setFinished] = useState(false);
   const [strictMode, setStrictRaw]= useState(false);
   const [recallText, setRecall]   = useState('');
+  const [attempted, setAttempted] = useState('0');
+  const [correct, setCorrect]     = useState('0');
 
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const syncLock  = useRef(false);
@@ -88,17 +94,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   }, [ratio, exam, section, topic]);
 
   const loadAll = useCallback(async (mounted: boolean) => {
-    // Load persistence
     try {
       const saved = await AsyncStorage.getItem('strictMode');
       if (saved !== null && mounted) setStrictRaw(JSON.parse(saved));
     } catch (e) {
       console.warn('Failed to load strictMode:', e);
     }
-
-    // Ensure Auth
     try {
-      setAuthReady(false); // Reset for retry
+      setAuthReady(false);
       const uid = await ensureAuth();
       if (mounted) {
         setUserId(uid);
@@ -113,17 +116,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  /* ── 1. Auth & Persistence ────────── */
   useEffect(() => {
     let mounted = true;
     loadAll(mounted);
     return () => { mounted = false; };
   }, [loadAll]);
 
-  /* ── 2. Tick ──────────────────────── */
   useEffect(() => {
     if (!isActive) return;
-
     timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
@@ -135,23 +135,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         return prev - 1;
       });
     }, 1000);
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [isActive]);
 
-  /* ── 3. Supabase sync helpers ────── */
   const syncToSupabase = useCallback(
     async (active: boolean, remaining: number) => {
       if (!userId) return;
       syncLock.current = true;
       try {
         const now = new Date();
-        const endTime = active
-          ? new Date(now.getTime() + remaining * 1000).toISOString()
-          : null;
-
+        const endTime = active ? new Date(now.getTime() + remaining * 1000).toISOString() : null;
         await supabase.from('timer_state').upsert(
           {
             user_id:           userId,
@@ -174,11 +169,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     [userId],
   );
 
-  /* ── 4. Realtime: cross-device sync ─ */
   useEffect(() => {
     if (!userId) return;
-
-    /* initial fetch */
     (async () => {
       try {
         const { data } = await supabase
@@ -190,12 +182,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         if (data) {
           syncLock.current = true;
           if (data.is_active && data.end_time) {
-            const rem = Math.max(
-              0,
-              Math.round(
-                (new Date(data.end_time).getTime() - Date.now()) / 1000,
-              ),
-            );
+            const rem = Math.max(0, Math.round((new Date(data.end_time).getTime() - Date.now()) / 1000));
             if (rem > 0) {
               setTimeLeft(rem);
               setIsActive(true);
@@ -219,30 +206,18 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    /* realtime channel */
     const channel = supabase
       .channel('timer-sync')
       .on(
         'postgres_changes',
-        {
-          event:  '*',
-          schema: 'public',
-          table:  'timer_state',
-          filter: `user_id=eq.${userId}`,
-        },
+        { event: '*', schema: 'public', table: 'timer_state', filter: `user_id=eq.${userId}` },
         payload => {
           if (syncLock.current) return;
           const d = payload.new as any;
           if (!d) return;
-
           syncLock.current = true;
           if (d.is_active && d.end_time) {
-            const rem = Math.max(
-              0,
-              Math.round(
-                (new Date(d.end_time).getTime() - Date.now()) / 1000,
-              ),
-            );
+            const rem = Math.max(0, Math.round((new Date(d.end_time).getTime() - Date.now()) / 1000));
             if (rem > 0) {
               setTimeLeft(rem);
               setIsActive(true);
@@ -261,18 +236,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           if (d.exam)    setExamRaw(d.exam);
           if (d.section) setSectionRaw(d.section);
           if (d.topic)   setTopicRaw(d.topic);
-
           setTimeout(() => { syncLock.current = false; }, 800);
         },
-      )
-      .subscribe();
+      ).subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, [userId]);
 
-  /* ── 5. Strict-mode: AppState watcher ─ */
   useEffect(() => {
     const handle = (next: AppStateStatus) => {
       if (next !== 'active' && activeRef.current && strictMode) {
@@ -282,7 +252,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setTimeLeft(resetVal);
         syncToSupabase(false, resetVal);
         if (Platform.OS === 'web') {
-          // eslint-disable-next-line no-alert
           (typeof alert !== 'undefined') && alert('Strict Mode Violation! Session failed.');
         } else {
           Alert.alert('Strict Mode', 'You left the app. Session failed.');
@@ -293,11 +262,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [strictMode, syncToSupabase]);
 
-  /* ── public actions ───────────────── */
   const startTimer = useCallback(() => {
     setIsActive(true);
     setFinished(false);
-    // We need the CURRENT timeLeft at action time, so read via updater
     setTimeLeft(prev => {
       syncToSupabase(true, prev);
       return prev;
@@ -338,61 +305,75 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     setExamRaw(e);
     const firstSec = Object.keys(SYLLABUS[e])[0];
     setSectionRaw(firstSec);
-    setTopicRaw(SYLLABUS[e][firstSec][0]);
+    setTopicRaw(SYLLABUS[e][firstSec].topics[0]);
   }, []);
 
   const setSection = useCallback(
     (s: string) => {
       setSectionRaw(s);
-      setTopicRaw(SYLLABUS[exam][s][0]);
+      setTopicRaw(SYLLABUS[exam][s].topics[0]);
     },
     [exam],
   );
 
   const setTopic = useCallback((t: string) => setTopicRaw(t), []);
 
-  const submitRecall = useCallback(() => {
-    if (recallText.length < 10) return;
+  const submitRecall = useCallback(async () => {
+    if (!userId) return;
+    const attCount = parseInt(attempted, 10) || 0;
+    const corCount = parseInt(correct, 10) || 0;
+    const sessionSeconds = (stateRef.current.ratio * 60) - timeLeft;
+
+    try {
+      // Fetch core topic for diagnostic update
+      const { data: topicRow } = await supabase
+        .from('topics')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('exam', stateRef.current.exam)
+        .eq('section', stateRef.current.section)
+        .eq('topic', stateRef.current.topic)
+        .maybeSingle();
+
+      if (topicRow) {
+        const newSolved = (topicRow.questionsSolved || 0) + attCount;
+        const newCorrect = (topicRow.questions_correct || 0) + corCount;
+        const oldTotalTime = (topicRow.avg_time_per_question || 0) * (topicRow.questionsSolved || 0);
+        const newTotalTime = oldTotalTime + sessionSeconds;
+        const newAvgTime = newSolved > 0 ? newTotalTime / newSolved : 0;
+
+        await supabase.from('topics').update({
+          questionsSolved: newSolved,
+          questions_correct: newCorrect,
+          avg_time_per_question: newAvgTime,
+          revision_count: (topicRow.revision_count || 0) + 1,
+          updated_at: new Date().toISOString(),
+        }).eq('id', topicRow.id);
+      }
+    } catch (e) {
+      console.warn('Diagnostic update failed:', e);
+    }
+
     setFinished(false);
     setRecall('');
+    setAttempted('0');
+    setCorrect('0');
     const newTime = stateRef.current.ratio * 60;
     setTimeLeft(newTime);
     syncToSupabase(false, newTime);
-  }, [recallText, syncToSupabase]);
+  }, [userId, attempted, correct, recallText, syncToSupabase, timeLeft]);
 
-  /* ── render ───────────────────────── */
   return (
     <Ctx.Provider
       value={{
-        userId,
-        authReady,
-        timeLeft,
-        isActive,
-        isFinished,
-        ratio,
-        exam,
-        section,
-        topic,
-        strictMode,
-        recallText,
-        setRatio,
-        setExam,
-        setSection,
-        setTopic,
+        userId, authReady, timeLeft, isActive, isFinished, ratio, exam, section, topic,
+        strictMode, recallText, attemptedThisSession: attempted, correctThisSession: correct,
+        setRatio, setExam, setSection, setTopic, setRecallText: setRecall, setAttempted, setCorrect,
         setStrictMode: async (v: boolean) => {
           setStrictRaw(v);
-          try {
-            await AsyncStorage.setItem('strictMode', JSON.stringify(v));
-          } catch (e) {
-            console.warn('Failed to save strictMode:', e);
-          }
+          try { await AsyncStorage.setItem('strictMode', JSON.stringify(v)); } catch (e) {}
         },
-        setRecallText: setRecall,
-        startTimer,
-        pauseTimer,
-        resetTimer,
-        submitRecall,
-        refreshAuth: () => loadAll(true),
+        startTimer, pauseTimer, resetTimer, submitRecall, refreshAuth: () => loadAll(true),
       }}
     >
       {children}
