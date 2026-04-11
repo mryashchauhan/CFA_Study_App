@@ -7,10 +7,9 @@ import {
   useWindowDimensions,
   ActivityIndicator,
   Pressable,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Plus, Minus, LayoutGrid, Zap, Target, RefreshCcw, WifiOff } from 'lucide-react-native';
+import { Plus, Minus, Zap, RefreshCcw, WifiOff } from 'lucide-react-native';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
 import {
@@ -18,13 +17,12 @@ import {
   R,
   SPACING,
   TYPOGRAPHY,
-  SHADOWS,
-  GRADIENTS,
   SYLLABUS,
   EXAM_LIST,
   EXAM_DATES,
   ExamType,
   pretty,
+  GRADIENTS,
 } from '@/constants/theme';
 
 interface Topic {
@@ -51,7 +49,7 @@ async function seedTopics(uid: string, exam: ExamType) {
         topic,
         questionsSolved: 0,
         totalQuestions: 50,
-        lod: lods[(idx + section.length) % 3], // Pseudo-random for visual variety without pure random instability
+        lod: lods[(idx + section.length) % 3],
       })),
     );
     await supabase.from('topics').upsert(rows, {
@@ -70,18 +68,14 @@ export default function PlannerScreen() {
   const [topics, setTopics]   = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const isDesktop = width >= 1200;
-  const isTablet = width >= 768 && width < 1200;
-  const numCols = isDesktop ? 3 : isTablet ? 2 : 1;
+  // Luxury Glass Responsive Constraints
+  const CONTENT_MAX_W = 1200;
+  const isDesktopGrid = width > 768;
+  const numCols = isDesktopGrid ? 3 : 1;
+  const cardGap = 24;
   
-  const CONTENT_MAX_W = 1100;
-  const effectiveWidth = Math.min(width, CONTENT_MAX_W);
-  
-  const pad = isDesktop ? 26 : 19;
-  const gap = 8;
-  const cardW = numCols === 1
-    ? '100%'
-    : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
+  // Padding for the root container
+  const rootPadding = width > 768 ? 32 : 16;
 
   useEffect(() => {
     if (!userId) return;
@@ -142,9 +136,6 @@ export default function PlannerScreen() {
                 if (prev.find(t => t.id === ins.id)) return prev;
                 return [...prev, ins];
               });
-          } else if (payload.eventType === 'DELETE') {
-            const del = payload.old as any;
-            setTopics(prev => prev.filter(t => t.id !== del.id));
           }
         },
       )
@@ -168,8 +159,6 @@ export default function PlannerScreen() {
         }),
       );
       
-      await new Promise(res => setTimeout(res, 50));
-      
       try {
         await supabase
           .from('topics')
@@ -182,28 +171,12 @@ export default function PlannerScreen() {
     [],
   );
 
-  const cycleLod = useCallback(
-    async (id: string) => {
-      const order: ('Easy' | 'Medium' | 'Hard')[] = ['Easy', 'Medium', 'Hard'];
-      const row = topics.find(t => t.id === id);
-      if (!row) return;
-      const next = order[(order.indexOf(row.lod) + 1) % 3];
-      setTopics(prev => prev.map(t => (t.id === id ? { ...t, lod: next } : t)));
-      try {
-        await supabase.from('topics').update({ lod: next }).eq('id', id);
-      } catch (error) {
-        console.warn('Supabase sync failed (lod):', error);
-      }
-    },
-    [topics],
-  );
-
   const totalQ   = topics.reduce((s, t) => s + t.totalQuestions, 0);
   const solved   = topics.reduce((s, t) => s + t.questionsSolved, 0);
   const remain   = totalQ - solved;
   const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
-  const daily    = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
+  const daily    = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day!'; 
   const pct      = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
@@ -214,7 +187,7 @@ export default function PlannerScreen() {
   if (!authReady) {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG }]}>
-        <ActivityIndicator size="large" color={C.accentIndigo} />
+        <ActivityIndicator size="large" color={C.accentCyan} />
       </View>
     );
   }
@@ -224,381 +197,264 @@ export default function PlannerScreen() {
       <View style={[s.center, { backgroundColor: C.primaryBG, padding: SPACING.xl }]}>
         <WifiOff size={48} color={C.textMuted} style={{ marginBottom: SPACING.lg }} />
         <Text style={[TYPOGRAPHY.sectionTitle, { color: C.white, textAlign: 'center', marginBottom: 8 }]}>Connection Required</Text>
-        <Text style={[TYPOGRAPHY.body, { textAlign: 'center', opacity: 0.6, marginBottom: SPACING.xxl }]}>
-          Unable to establish a secure session with the syllabus database. Please check your internet connection.
-        </Text>
-        <Pressable 
-          onPress={refreshAuth}
-          style={({ pressed }) => [s.retryBtn, pressed && { opacity: 0.8 }]}
-        >
-          <LinearGradient colors={GRADIENTS.cta} style={s.retryGradient}>
-            <RefreshCcw size={18} color={C.white} style={{ marginRight: 8 }} />
-            <Text style={TYPOGRAPHY.buttonText}>Retry Connection</Text>
-          </LinearGradient>
+        <Pressable onPress={refreshAuth} style={s.retryBtn}>
+           <Text style={TYPOGRAPHY.buttonText}>Retry Connection</Text>
         </Pressable>
       </View>
     );
   }
 
-  const titleStyle = width >= 768 ? TYPOGRAPHY.screenTitleTablet : TYPOGRAPHY.screenTitleMobile;
-
   return (
     <View style={s.root}>
-      <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
-      
-      {/* Background Atmosphere - Obsidians */}
-      <View style={[s.blob, s.blob1, { opacity: 0.02 }]} />
+      <LinearGradient colors={['#0D0F14', '#11141B']} style={StyleSheet.absoluteFillObject} />
       
       <ScrollView 
-        contentContainerStyle={[
-          s.scroll, 
-          { paddingHorizontal: pad, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' }
-        ]} 
+        contentContainerStyle={s.scroll} 
         showsVerticalScrollIndicator={false}
       >
-        <View style={s.header}>
-          <Text style={[TYPOGRAPHY.screenTitleTablet, { fontSize: isDesktop ? 48 : 34, fontWeight: '800' }]}>Study Planner</Text>
-          <Text style={[s.subtitle, { fontSize: isDesktop ? 18 : 15, color: 'rgba(255,255,255,0.5)' }]}>Overview & Progress Tracking</Text>
-        </View>
-
-        <View style={s.pills}>
-          {EXAM_LIST.map(e => {
-            const on = e === selectedExam;
-            return (
-              <Pressable
-                key={e}
-                onPress={() => setSelectedExam(e)}
-                style={({ pressed }) => [
-                  s.examPill,
-                  on ? s.examPillOn : s.examPillOff,
-                  pressed && { opacity: 0.8 }
-                ]}
-              >
-                {on && (
-                  <LinearGradient 
-                    colors={GRADIENTS.glass} 
-                    style={[StyleSheet.absoluteFillObject, { borderRadius: R.xs }]} 
-                  />
-                )}
-                <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={[s.heroCard, SHADOWS.shadowGlass]}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.01)', 'transparent']}
-            style={[StyleSheet.absoluteFillObject, { borderRadius: R.md }]}
-          />
-          <View style={s.heroHeader}>
-            <View style={s.heroTtlRow}>
-               <Zap size={20} color={C.accentCyan} />
-               <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Progress</Text>
-            </View>
-            <View style={s.heroBadge}>
-              <Text style={s.badgeTxt}>
-                {examDate.toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                }).toUpperCase()}
-              </Text>
-            </View>
+        {/* Responsive Anchor 1200px Wrapper */}
+        <View style={s.anchor}>
+          
+          <View style={s.header}>
+            <Text style={[TYPOGRAPHY.screenTitleTablet, { fontSize: isDesktopGrid ? 56 : 38, fontWeight: '900', color: C.white }]}>Study Planner</Text>
+            <Text style={s.subtitle}>Management Cockpit</Text>
           </View>
 
-          <View style={s.statsRow}>
-            {[
-              ['SOLVED', String(solved)],
-              ['LEFT', String(remain)],
-              ['DAYS', String(daysLeft)],
-            ].map(([lbl, val]) => (
-              <View key={lbl} style={s.statBox}>
-                <Text style={s.statLbl}>{lbl}</Text>
-                <View style={s.valContainer}>
-                  <Text 
-                    numberOfLines={1} 
-                    adjustsFontSizeToFit 
-                    style={s.statVal}
-                  >
-                    {val}
-                  </Text>
-                </View>
+          <View style={s.pills}>
+            {EXAM_LIST.map(e => {
+              const on = e === selectedExam;
+              return (
+                <Pressable
+                  key={e}
+                  onPress={() => setSelectedExam(e)}
+                  style={[s.examPill, on ? s.examPillOn : s.examPillOff]}
+                >
+                  <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Luxury Analytics Hero Card */}
+          <View style={[s.heroCard, { shadowOpacity: 0.1 }]}>
+            <View style={s.heroHeader}>
+              <View style={s.heroTtlRow}>
+                 <Zap size={22} color={C.accentCyan} />
+                 <Text style={s.heroTitle}>{selectedExam} Performance Overview</Text>
               </View>
-            ))}
-          </View>
+              <View style={s.heroBadge}>
+                <Text style={s.badgeTxt}>{examDate.toDateString().toUpperCase()}</Text>
+              </View>
+            </View>
 
-          <View style={s.pacingWrap}>
-             <Text style={s.pacing}>
-               Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
-             </Text>
-          </View>
-          <View style={s.barContainer}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <View style={[s.barBgHero, { flex: 1 }]}>
-                <LinearGradient
-                  colors={GRADIENTS.premiumCTA}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
+            <View style={s.statsRow}>
+               <View style={s.statBox}>
+                  <Text style={s.statLbl}>SOLVED</Text>
+                  <Text style={s.statVal}>{solved}</Text>
+               </View>
+               <View style={s.statBox}>
+                  <Text style={s.statLbl}>LEFT</Text>
+                  <Text style={s.statVal}>{remain}</Text>
+               </View>
+               <View style={s.statBox}>
+                  <Text style={s.statLbl}>DAYS</Text>
+                  <Text style={s.statVal}>{daysLeft}</Text>
+               </View>
+            </View>
+
+            <View style={s.pacingWrap}>
+               <Text style={s.pacing}>
+                 Required Mastery Pace: <Text style={{ color: C.accentCyan, fontWeight: '800' }}>{daily} Qs / day</Text>
+               </Text>
+            </View>
+
+            <View style={s.barContainer}>
+               <View style={s.barBgHero}>
+                 <LinearGradient
+                  colors={['#00D9F5', '#0072FF']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                   style={[s.barFillHero, { width: `${pct}%` }]}
-                />
-              </View>
-              <Text style={[s.pctTxt, { marginLeft: 12, marginTop: 0 }]}>{pct}%</Text>
+                 />
+               </View>
+               <Text style={s.pctTxt}>{pct}% Mastery</Text>
             </View>
           </View>
-        </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={C.accentIndigo} style={{ marginTop: SPACING.xxl }} />
-        ) : (
-          Object.entries(grouped).map(([sec, rows]) => (
-            <View key={sec} style={{ marginBottom: SPACING.xl }}>
-              <View style={[s.secHead, { justifyContent: 'space-between' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[TYPOGRAPHY.sectionTitle, { fontSize: 18, fontWeight: '800', color: 'rgba(255,255,255,0.7)' }]}>{pretty(sec)}</Text>
+          {loading ? (
+            <ActivityIndicator size="large" color={C.accentCyan} style={{ marginTop: 60 }} />
+          ) : (
+            Object.entries(grouped).map(([sec, rows]) => (
+              <View key={sec} style={{ marginBottom: 40 }}>
+                <View style={s.secHead}>
+                  <Text style={s.sectionLabel}>{pretty(sec)}</Text>
+                </View>
+
+                <View style={[s.grid, { gap: cardGap }]}>
+                  {rows.map(t => {
+                    const prog = t.totalQuestions > 0 ? Math.round((t.questionsSolved / t.totalQuestions) * 100) : 0;
+                    return (
+                      <View key={t.id} style={[s.topicCardWrap, { width: isDesktopGrid ? '31%' : '100%' }]}>
+                         <View style={s.topicCard}>
+                            <View style={s.topicHead}>
+                               <Text style={s.topicMeta}>{pretty(t.section).toUpperCase()}</Text>
+                               <View style={s.lodBadge}>
+                                  <Text style={s.lodTxt}>{t.lod}</Text>
+                               </View>
+                            </View>
+
+                            <Text style={s.topicName} numberOfLines={2}>{t.topic}</Text>
+
+                            <Text style={s.solvedSplit}>
+                               {prog}% • {t.questionsSolved}/{t.totalQuestions}
+                            </Text>
+
+                            <View style={s.glassStrip}>
+                               <Pressable onPress={() => bump(t.id, -1)} style={s.stepBtn}>
+                                  <Minus size={20} color="rgba(255,255,255,0.6)" />
+                               </Pressable>
+                               
+                               <Text style={s.stepVal}>{t.questionsSolved}</Text>
+                               
+                               <Pressable onPress={() => bump(t.id, 1)} style={s.stepBtn}>
+                                  <Plus size={20} color={C.white} />
+                               </Pressable>
+                            </View>
+                         </View>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
-
-              <View style={[s.grid, { gap }]}>
-                {rows.map(t => {
-                  const prog = t.totalQuestions > 0
-                    ? Math.min(100, Math.round((t.questionsSolved / t.totalQuestions) * 100))
-                    : 0;
-                  const hard = t.lod === 'Hard';
-                  const easy = t.lod === 'Easy';
-                  
-                  let lodColor: string = 'rgba(234, 179, 8, 0.4)';
-                  let lodBg = 'rgba(234, 179, 8, 0.02)';
-                  
-                  if (hard) {
-                    lodColor = 'rgba(239, 68, 68, 0.4)';
-                    lodBg = 'rgba(239, 68, 68, 0.02)';
-                  } else if (easy) {
-                    lodColor = 'rgba(16, 185, 129, 0.4)';
-                    lodBg = 'rgba(16, 185, 129, 0.02)';
-                  }
-                  
-                  return (
-                    <View key={t.id} style={{ width: cardW }}>
-                       <View style={s.topicCard}>
-                         <View style={s.topicHead}>
-                           <Text style={s.topicMeta}>{pretty(t.section).toUpperCase()}</Text>
-                           <View style={[s.lodBadge, { backgroundColor: lodBg }]}>
-                             <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
-                           </View>
-                         </View>
-
-                         <Text style={s.topicName} numberOfLines={2}>
-                           {t.topic}
-                         </Text>
-
-                         <Text style={[s.solvedSplit, { fontSize: 13, color: C.textSecondary }]}>
-                            {prog}%  •  {t.questionsSolved}/{t.totalQuestions}
-                         </Text>
-
-                         <View style={[s.glassStrip, { marginTop: 6 }]}>
-                            <Pressable
-                              onPress={() => bump(t.id, -1)}
-                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
-                            >
-                              <Minus size={16} color={C.textMuted} />
-                            </Pressable>
-                            
-                            <Text style={s.stepVal}>{t.questionsSolved}</Text>
-                            
-                            <Pressable
-                              onPress={() => bump(t.id, 1)}
-                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
-                            >
-                              <Plus size={16} color={C.white} />
-                            </Pressable>
-                         </View>
-                       </View>
-                    </View>
-                  );
-                })}
-              </View>
-            </View>
-          ))
-        )}
+            ))
+          )}
+        </View>
       </ScrollView>
     </View>
   );
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.primaryBG },
-  blob: {
-    position: 'absolute',
-    borderRadius: 9999,
-    width: 400,
-    height: 400,
-  },
-  blob1: { top: -100, left: -100, backgroundColor: C.accentIndigo },
-
-  scroll: { paddingTop: 12, paddingBottom: SPACING.xxxl },
+  root: { flex: 1, backgroundColor: '#0D0F14' },
+  scroll: { paddingTop: 40, paddingBottom: 100 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   
-  header: { marginBottom: 8, paddingHorizontal: SPACING.xs },
-  subtitle: { ...TYPOGRAPHY.body, fontSize: 13, marginTop: 4, opacity: 0.5 },
-  
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 12 },
-  examPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: R.xs,
-    borderWidth: 1,
-    overflow: 'hidden',
+  anchor: {
+    width: '100%',
+    maxWidth: 1200,
+    alignSelf: 'center',
+    paddingHorizontal: 32,
   },
-  examPillOff: {
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+
+  header: { marginBottom: 24 },
+  subtitle: { ...TYPOGRAPHY.body, fontSize: 16, color: 'rgba(255,255,255,0.4)', marginTop: 4, fontWeight: '600' },
+  
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
+  examPill: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.03)',
   },
   examPillOn: { 
     borderColor: C.accentCyan, 
-    borderWidth: 2,
-    backgroundColor: 'rgba(6,182,212,0.1)' 
+    backgroundColor: 'rgba(0,217,245,0.1)' 
   },
-  examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
+  examPillTxt: { color: 'rgba(255,255,255,0.5)', fontSize: 14, fontWeight: '700' },
   examPillTxtOn: { color: C.white },
 
   heroCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1.5,
-    borderColor: 'rgba(34, 211, 238, 0.2)',
-    padding: 18,
-    marginBottom: 30,
-    overflow: 'hidden',
+    backgroundColor: '#11141B',
+    borderRadius: 32,
+    padding: 40,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    shadowColor: '#00D9F5',
+    shadowOpacity: 0.1,
+    shadowRadius: 30,
+    elevation: 10,
   },
+  heroTitle: { fontSize: 20, fontWeight: '800', color: C.white, marginLeft: 12 },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   heroTtlRow: { flexDirection: 'row', alignItems: 'center' },
-  heroBadge: {
-    backgroundColor: '#000',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  badgeTxt: { ...TYPOGRAPHY.meta, color: C.textSecondary, fontSize: 9, letterSpacing: 0.5 },
+  heroBadge: { backgroundColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8 },
+  badgeTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    backgroundColor: '#000',
-    padding: 10,
-    borderRadius: R.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    gap: 8,
+    marginTop: 32,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    padding: 24,
+    borderRadius: 20,
+    gap: 20,
   },
-  statBox: { 
-    alignItems: 'center', 
-    justifyContent: 'center',
-    flex: 1,
-  },
-  statLbl: { 
-    ...TYPOGRAPHY.meta, 
-    marginBottom: 6, 
-    fontSize: 9, 
-    opacity: 0.6,
-    textAlign: 'center',
-  },
-  valContainer: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  statVal: { color: C.white, fontSize: 40, fontWeight: '900', lineHeight: 48, textAlign: 'center' },
+  statBox: { flex: 1, alignItems: 'center' },
+  statLbl: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800', marginBottom: 8 },
+  statVal: { color: C.white, fontSize: 36, fontWeight: '900' },
   
-  pacingWrap: { marginTop: 6, alignItems: 'center' },
-  pacing: { ...TYPOGRAPHY.body, fontSize: 13, opacity: 0.7 },
+  pacingWrap: { marginTop: 20, alignItems: 'center' },
+  pacing: { color: 'rgba(255,255,255,0.6)', fontSize: 15 },
   
-  barContainer: { marginTop: 8 },
+  barContainer: { marginTop: 24, alignItems: 'center' },
   barBgHero: {
-    height: 6,
+    width: '100%',
+    height: 8,
     backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
   },
-  barFillHero: { height: 6, borderRadius: 3 },
-  pctTxt: {
-    color: C.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 6,
-    fontWeight: '700',
-  },
+  barFillHero: { height: '100%', borderRadius: 4 },
+  pctTxt: { color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '700', marginTop: 10 },
 
-  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 2, paddingLeft: SPACING.xs },
-  sectionLabel: { marginBottom: 0, marginLeft: 8, fontSize: 16, opacity: 0.8 },
+  secHead: { marginBottom: 12 },
+  sectionLabel: { fontSize: 20, fontWeight: '800', color: 'rgba(255,255,255,0.8)' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
+  topicCardWrap: { marginBottom: 12 },
   topicCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.md,
+    backgroundColor: '#161A22',
+    borderRadius: 24,
+    padding: 24,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
-  topicHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
-  lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  topicName: { marginBottom: 0, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  topicHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  topicMeta: { color: 'rgba(255,255,255,0.3)', fontSize: 10, fontWeight: '800' },
+  lodBadge: { backgroundColor: 'rgba(0,217,245,0.05)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 },
+  lodTxt: { color: C.accentCyan, fontSize: 9, fontWeight: '900', textTransform: 'uppercase' },
+  topicName: { fontSize: 22, fontWeight: '800', color: C.white, lineHeight: 30 },
+  solvedSplit: { color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600', marginTop: 8 },
   
-  topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
-  solvedSplit: { color: C.textMuted, fontSize: 11, fontWeight: '600', opacity: 0.5 },
-  
-  miniBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, marginBottom: SPACING.lg, overflow: 'hidden' },
-  miniBarFill: { height: 3, borderRadius: 1.5 },
-
   glassStrip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    height: 44,
-    borderRadius: R.pill,
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    padding: 8,
+    borderRadius: 16,
+    marginTop: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-    gap: 25,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   stepBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
-  stepVal: {
-    color: C.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
-    minWidth: 32,
-    textAlign: 'center',
-  },
+  stepVal: { color: C.white, fontSize: 22, fontWeight: '800' },
   
   retryBtn: {
-    borderRadius: R.sm,
-    overflow: 'hidden',
-    width: '100%',
-    maxWidth: 240,
-  },
-  retryGradient: {
+    backgroundColor: C.accentCyan,
+    paddingHorizontal: 24,
     paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 12,
+    marginTop: 20,
   },
 });
