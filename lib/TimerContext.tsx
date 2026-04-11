@@ -324,11 +324,12 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const setRatio = useCallback(
     (r: number) => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      setIsActive(false);
+      setFinished(false);
       setRatioRaw(r);
-      if (!activeRef.current) {
-        setTimeLeft(r * 60);
-        syncToSupabase(false, r * 60);
-      }
+      setTimeLeft(r * 60);
+      syncToSupabase(false, r * 60);
     },
     [syncToSupabase],
   );

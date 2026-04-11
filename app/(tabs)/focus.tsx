@@ -124,7 +124,7 @@ export default function FocusScreen() {
             style={s.pathTxt} 
             numberOfLines={1}
             adjustsFontSizeToFit
-            minimumFontScale={0.7}
+            minimumFontScale={0.85}
           >
             {exam}  ›  {pretty(section)}  ›  {topic}
           </Text>
@@ -344,15 +344,15 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: R.xs,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
     marginBottom: SPACING.xl,
   },
 
   pathTxt: {
     ...TYPOGRAPHY.meta,
-    fontSize: 10,
-    letterSpacing: 1.5,
+    fontSize: 13,
+    letterSpacing: 0.5,
     color: C.accentBlue,
   },
 
