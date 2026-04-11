@@ -76,8 +76,8 @@ export default function PlannerScreen() {
   const CONTENT_MAX_W = 1100;
   const effectiveWidth = Math.min(width, CONTENT_MAX_W);
   
-  const pad = isDesktop ? SPACING.xl : SPACING.lg;
-  const gap = SPACING.md;
+  const pad = isDesktop ? 26 : 19;
+  const gap = 8;
   const cardW = numCols === 1
     ? '100%'
     : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
@@ -293,14 +293,14 @@ export default function PlannerScreen() {
           <View style={s.heroHeader}>
             <View style={s.heroTtlRow}>
                <Zap size={20} color={C.accentCyan} />
-               <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
+               <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Progress</Text>
             </View>
             <View style={s.heroBadge}>
               <Text style={s.badgeTxt}>
                 {examDate.toLocaleDateString(undefined, {
                   month: 'short',
                   day: 'numeric',
-                })}
+                }).toUpperCase()}
               </Text>
             </View>
           </View>
@@ -331,17 +331,18 @@ export default function PlannerScreen() {
                Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
              </Text>
           </View>
-
-          <View style={[s.barContainer, { flexDirection: 'row', alignItems: 'center' }]}>
-            <View style={[s.barBgHero, { flex: 1, marginRight: 12 }]}>
-              <LinearGradient
-                colors={GRADIENTS.premiumCTA}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[s.barFillHero, { width: `${pct}%` }]}
-              />
+          <View style={s.barContainer}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={[s.barBgHero, { flex: 1 }]}>
+                <LinearGradient
+                  colors={GRADIENTS.premiumCTA}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[s.barFillHero, { width: `${pct}%` }]}
+                />
+              </View>
+              <Text style={[s.pctTxt, { marginLeft: 12, marginTop: 0 }]}>{pct}%</Text>
             </View>
-            <Text style={[s.pctTxt, { marginTop: 0 }]}>{pct}%</Text>
           </View>
         </View>
 
@@ -350,9 +351,14 @@ export default function PlannerScreen() {
         ) : (
           Object.entries(grouped).map(([sec, rows]) => (
             <View key={sec} style={{ marginBottom: SPACING.xl }}>
-              <View style={s.secHead}>
-                <LayoutGrid size={18} color={C.accentCyan} />
-                <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel, { fontSize: 20, fontWeight: '800', color: C.white }]}>{pretty(sec)}</Text>
+              <View style={[s.secHead, { justifyContent: 'space-between' }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[TYPOGRAPHY.sectionTitle, { fontSize: 20, fontWeight: '800', color: C.white }]}>{pretty(sec)}</Text>
+                </View>
+                
+                <View style={[s.lodBadge, { backgroundColor: 'rgba(234, 179, 8, 0.12)', borderColor: 'rgba(234, 179, 8, 0.2)', borderWidth: 1 }]}>
+                  <Text style={[s.lodTxt, { color: C.warning, fontSize: 10 }]}>{rows[0]?.lod?.toUpperCase() || 'MEDIUM'}</Text>
+                </View>
               </View>
 
               <View style={[s.grid, { gap }]}>
@@ -373,52 +379,40 @@ export default function PlannerScreen() {
                     lodColor = C.success;
                     lodBg = 'rgba(16, 185, 129, 0.08)';
                   }
-
+                  
                   return (
                     <View key={t.id} style={{ width: cardW }}>
-                       <View 
-                        style={[
-                          s.topicCard, 
-                          hard && { borderColor: 'rgba(239, 68, 68, 0.2)' }
-                        ]}
-                       >
+                       <View style={s.topicCard}>
                          <View style={s.topicHead}>
-                           <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
-                           <Pressable
-                             onPress={() => cycleLod(t.id)}
-                             style={[s.lodBadge, { backgroundColor: lodBg }]}
-                           >
+                           <Text style={s.topicMeta}>{pretty(t.section).toUpperCase()}</Text>
+                           <View style={[s.lodBadge, { backgroundColor: lodBg }]}>
                              <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
-                           </Pressable>
+                           </View>
                          </View>
 
-                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
+                         <Text style={s.topicName} numberOfLines={2}>
                            {t.topic}
                          </Text>
 
-                         <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
-                            {prog}% • {t.questionsSolved}/{t.totalQuestions}
+                         <Text style={[s.solvedSplit, { fontSize: 13, color: C.textSecondary }]}>
+                            {prog}%  •  {t.questionsSolved}/{t.totalQuestions}
                          </Text>
 
-                         <View style={s.glassStrip}>
+                         <View style={[s.glassStrip, { marginTop: 6 }]}>
                             <Pressable
                               onPress={() => bump(t.id, -1)}
                               style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
                             >
-                              <Minus size={20} color={C.textMuted} />
+                              <Minus size={16} color={C.textMuted} />
                             </Pressable>
                             
                             <Text style={s.stepVal}>{t.questionsSolved}</Text>
                             
                             <Pressable
                               onPress={() => bump(t.id, 1)}
-                              style={({ pressed }) => [
-                                s.stepBtn, 
-                                s.stepBtnAdd,
-                                pressed && { opacity: 0.6 }
-                              ]}
+                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
                             >
-                              <Plus size={20} color={C.white} />
+                              <Plus size={16} color={C.white} />
                             </Pressable>
                          </View>
                        </View>
@@ -475,8 +469,8 @@ const s = StyleSheet.create({
     borderRadius: R.md,
     borderWidth: 1.5,
     borderColor: 'rgba(34, 211, 238, 0.2)',
-    padding: SPACING.lg,
-    marginBottom: SPACING.xxl,
+    padding: 18,
+    marginBottom: 30,
     overflow: 'hidden',
   },
   heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -541,7 +535,7 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
 
-  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md, paddingLeft: SPACING.xs },
+  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingLeft: SPACING.xs },
   sectionLabel: { marginBottom: 0, marginLeft: 8, fontSize: 16, opacity: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
@@ -550,7 +544,8 @@ const s = StyleSheet.create({
     borderRadius: R.md,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.04)',
-    padding: SPACING.md,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
   },
   topicHead: {
     flexDirection: 'row',
@@ -561,7 +556,7 @@ const s = StyleSheet.create({
   topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
   lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  topicName: { marginBottom: SPACING.md, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  topicName: { marginBottom: 4, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
   
   topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
@@ -574,35 +569,27 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderRadius: R.xs,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    height: 44,
+    borderRadius: R.pill,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    gap: 20,
+    borderColor: 'rgba(255,255,255,0.06)',
+    gap: 25,
   },
   stepBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  stepBtnAdd: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderColor: 'rgba(99, 102, 241, 0.3)',
-  },
   stepVal: {
     color: C.textPrimary,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '800',
-    minWidth: 30,
+    minWidth: 32,
     textAlign: 'center',
-    fontVariant: ['tabular-nums'],
   },
   
   retryBtn: {
