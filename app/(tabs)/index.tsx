@@ -249,9 +249,19 @@ export default function PlannerScreen() {
                   </View>
 
                   <View style={s.heroProgressGroup}>
-                    <Text style={s.progValue}>{stats.progress.toFixed(0)}% Overall</Text>
+                    <View style={s.heroMetricRow}>
+                      <View>
+                         <Text style={s.metricLabel}>OVERALL MASTERY</Text>
+                         <Text style={s.progValue}>{stats.progress.toFixed(0)}%</Text>
+                      </View>
+                      <View style={s.metricDivider} />
+                      <View>
+                         <Text style={s.metricLabel}>ACCURACY</Text>
+                         <Text style={s.progValue}>{stats.acc}%</Text>
+                      </View>
+                    </View>
                     <View style={s.heroPaceRow}>
-                      <Text style={s.paceLabel}>PACE: {stats.pace} Qs/Day</Text>
+                      <Text style={s.paceLabel}>SUGGESTED PACE: <Text style={s.paceValue}>{stats.pace} Qs / Day</Text></Text>
                     </View>
                   </View>
                 </View>
@@ -436,18 +446,18 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  greeting: { color: C.textMuted, fontSize: 14, fontWeight: '500' },
-  mainTitle: { color: C.white, fontSize: 32, fontWeight: '900' },
+  greeting: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '500', letterSpacing: 0.5 },
+  mainTitle: { color: C.white, fontSize: 34, fontWeight: '900', marginTop: 4 },
   headerIcons: { flexDirection: 'row', gap: 12 },
   iconBtn: {
     width: 44,
     height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
 
   pillRow: { flexDirection: 'row', gap: 12 },
@@ -466,12 +476,12 @@ const s = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 16,
     paddingHorizontal: 16,
-    width: 280,
+    width: 300,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.08)',
   },
   searchIcon: { marginRight: 10 },
   searchInput: {
@@ -487,40 +497,49 @@ const s = StyleSheet.create({
   /* Hero Card Styles */
   heroWrapper: {
     paddingHorizontal: SPACING.xl,
-    marginBottom: 40,
+    marginVertical: 48,
   },
   heroCard: {
-    borderRadius: 32,
-    padding: 40,
-    minHeight: 260,
+    borderRadius: 28,
+    padding: 44,
+    minHeight: 280,
     overflow: 'hidden',
     flexDirection: 'row',
     justifyContent: 'space-between',
+    backgroundColor: '#111827',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.06)',
     ...SHADOWS.shadowSoft,
   },
   heroMainContent: { flex: 1, zIndex: 10 },
-  heroCategory: { color: C.accentCyan, fontSize: 12, fontWeight: '900', letterSpacing: 1.5 },
+  heroCategory: { color: C.accentCyan, fontSize: 13, fontWeight: '900', letterSpacing: 1.8 },
   heroHeading: {
     color: C.white,
     fontWeight: '900',
-    marginTop: 12,
+    marginTop: 14,
   },
-  heroSub: { color: 'rgba(255,255,255,0.4)', fontSize: 16, marginTop: 12, maxWidth: 450 },
+  heroSub: { color: 'rgba(255,255,255,0.4)', fontSize: 16, marginTop: 16, maxWidth: 500, lineHeight: 24 },
   heroStatsRow: { flexDirection: 'row', gap: 16, marginTop: 24 },
   heroStatChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
-  heroStatText: { color: C.white, fontSize: 14, fontWeight: '700' },
-  heroProgressGroup: { marginTop: 30 },
-  progValue: { color: C.white, fontSize: 24, fontWeight: '900' },
-  heroPaceRow: { marginTop: 8 },
-  paceLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 13, fontWeight: '600' },
+  heroStatText: { color: C.white, fontSize: 14, fontWeight: '800' },
+  heroProgressGroup: { marginTop: 40 },
+  heroMetricRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
+  metricLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 11, fontWeight: '900', letterSpacing: 1, marginBottom: 8 },
+  metricDivider: { width: 1, height: 40, backgroundColor: 'rgba(255,255,255,0.1)' },
+  progValue: { color: C.white, fontSize: 36, fontWeight: '900' },
+  heroPaceRow: { marginTop: 24, paddingTop: 20, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.05)', maxWidth: 300 },
+  paceLabel: { color: 'rgba(255,255,255,0.4)', fontSize: 14, fontWeight: '600' },
+  paceValue: { color: C.white, fontWeight: '800' },
   heroGlow: {
     position: 'absolute',
     right: -100,
@@ -540,18 +559,19 @@ const s = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  sectionTitle: { color: C.white, fontSize: 24, fontWeight: '900' },
-  viewAll: { color: C.accentCyan, fontSize: 14, fontWeight: '700' },
-  topicsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 24 },
-
+  sectionTitle: { color: C.white, fontSize: 26, fontWeight: '900' },
+  viewAll: { color: C.accentCyan, fontSize: 14, fontWeight: '800', letterSpacing: 0.5 },
+  topicsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 32 },
+  
   /* Topic Card Styles */
   topicCard: {
-    backgroundColor: '#111827',
-    borderRadius: 24,
-    padding: 24,
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 28,
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.03)',
+    borderColor: 'rgba(255,255,255,0.05)',
+    ...SHADOWS.shadowSoft,
   },
   cardTop: {
     flexDirection: 'row',
@@ -606,13 +626,15 @@ const s = StyleSheet.create({
   targetEditor: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    gap: 12,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
-  countLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '800' },
+  countLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
 
   tactileControls: {
     flexDirection: 'row',
