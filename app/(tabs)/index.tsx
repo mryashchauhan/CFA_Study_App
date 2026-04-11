@@ -312,14 +312,14 @@ export default function PlannerScreen() {
 
                           <View style={s.diagnosticRow}>
                              <View style={s.diagBox}>
-                                <Award size={14} color={t.accuracy >= 70 ? C.success : C.accentRed} />
-                                <Text style={[s.diagTxt, { color: t.accuracy >= 70 ? C.success : C.accentRed }]}>
-                                   {t.accuracy.toFixed(1)}% Acc
+                                <Award size={14} color={(t.accuracy || 0) >= 70 ? C.success : C.accentRed} />
+                                <Text style={[s.diagTxt, { color: (t.accuracy || 0) >= 70 ? C.success : C.accentRed }]}>
+                                   {(t.accuracy || 0).toFixed(1)}% Acc
                                 </Text>
                              </View>
                              <View style={s.diagBox}>
                                 <Clock size={14} color={C.textMuted} />
-                                <Text style={s.diagTxt}>{t.avg_time_per_question.toFixed(0)}s/Q</Text>
+                                <Text style={s.diagTxt}>{(t.avg_time_per_question || 0).toFixed(0)}s/Q</Text>
                              </View>
                           </View>
 
