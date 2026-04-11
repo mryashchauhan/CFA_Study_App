@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Pressable,
   Platform,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -78,6 +79,7 @@ export default function PlannerScreen() {
   const [selectedExam, setSelectedExam] = useState<ExamType>('CFA');
   const [topics, setTopics] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const isDesktop = width > 900;
   const isTablet = width > 600;
@@ -119,15 +121,26 @@ export default function PlannerScreen() {
     await supabase.from('topics').update({ lod: level }).eq('id', id);
   };
 
+  const setTarget = async (id: string, target: number) => {
+    const val = Math.max(1, target);
+    setTopics((prev) => prev.map((t) => (t.id === id ? { ...t, totalQuestions: val } : t)));
+    await supabase.from('topics').update({ totalQuestions: val }).eq('id', id);
+  };
+
   const processed = useMemo(() => {
     return topics
       .map((t) => {
-        const target = (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
+        // Use DB totalQuestions if > 0, otherwise fall back to syllabus TARGETS
+        const target = t.totalQuestions > 0 ? t.totalQuestions : (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
         const acc = t.questionsSolved > 0 ? (t.questions_correct / t.questionsSolved) * 100 : 0;
         return { ...t, acc, target, prio: (t.topic_weight || 0) * (1 - acc / 100) };
       })
+      .filter(t => 
+        t.topic.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        t.section.toLowerCase().includes(searchQuery.toLowerCase())
+      )
       .sort((a, b) => b.prio - a.prio);
-  }, [topics, selectedExam]);
+  }, [topics, selectedExam, searchQuery]);
 
   const stats = useMemo(() => {
     const solved = topics.reduce((s, t) => s + (t.questionsSolved || 0), 0);
@@ -140,12 +153,12 @@ export default function PlannerScreen() {
       )
     );
     const totalTarget = topics.reduce((s, t) => {
-      const target = (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
+      const target = t.totalQuestions > 0 ? t.totalQuestions : (selectedExam === 'CFA' ? TARGETS[t.section] : 100) || 100;
       return s + target;
     }, 0);
     const totalProg = totalTarget > 0 ? (solved / totalTarget) * 100 : 0;
 
-    return { acc, pace: ((1500 - solved) / days).toFixed(1), days, progress: totalProg };
+    return { acc, pace: ((totalTarget - solved) / days).toFixed(1), days, progress: totalProg };
   }, [topics, selectedExam]);
 
   if (!authReady || loading)
@@ -161,31 +174,6 @@ export default function PlannerScreen() {
 
       {/* Layout Container */}
       <View style={s.layoutContainer}>
-        {/* Sidebar (Desktop Only) */}
-        {isDesktop && (
-          <View style={s.sidebar}>
-            <View style={s.sideLogo}>
-              <View style={s.logoCircle}>
-                <Layers size={20} color={C.accentCyan} />
-              </View>
-            </View>
-            <View style={s.sideNav}>
-              <Pressable style={s.sideItemActive}>
-                <LayoutDashboard size={24} color={C.accentCyan} />
-              </Pressable>
-              <Pressable style={s.sideItem}>
-                <Calendar size={24} color={C.textMuted} />
-              </Pressable>
-              <Pressable style={s.sideItem}>
-                <Target size={24} color={C.textMuted} />
-              </Pressable>
-              <Pressable style={s.sideItem}>
-                <Award size={24} color={C.textMuted} />
-              </Pressable>
-            </View>
-          </View>
-        )}
-
         {/* Main Content Area */}
         <View style={s.mainContent}>
           <ScrollView
@@ -201,9 +189,16 @@ export default function PlannerScreen() {
                   <Text style={s.mainTitle}>Overview</Text>
                 </View>
                 <View style={s.headerIcons}>
-                  <Pressable style={s.iconBtn}>
-                    <Search size={22} color={C.textMuted} />
-                  </Pressable>
+                  <View style={s.searchContainer}>
+                    <Search size={18} color={C.textMuted} style={s.searchIcon} />
+                    <TextInput
+                      style={s.searchInput}
+                      placeholder="Search topics..."
+                      placeholderTextColor={C.textMuted}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                  </View>
                   <Pressable style={s.iconBtn}>
                     <Bell size={22} color={C.textMuted} />
                   </Pressable>
@@ -298,16 +293,19 @@ export default function PlannerScreen() {
 
                         {/* DIFFICULTY SELECTOR */}
                         <View style={s.difficultyPicker}>
-                          {['E', 'M', 'H'].map((lvl) => {
-                            const map = { E: 'Easy', M: 'Medium', H: 'Hard' };
-                            const active = t.lod === map[lvl as keyof typeof map];
+                          {[
+                            { l: 'B', v: 'Easy' },
+                            { l: 'I', v: 'Medium' },
+                            { l: 'M', v: 'Hard' }
+                          ].map((lvl) => {
+                            const active = t.lod === lvl.v;
                             return (
                               <Pressable
-                                key={lvl}
-                                onPress={() => setDifficulty(t.id, map[lvl as keyof typeof map])}
+                                key={lvl.v}
+                                onPress={() => setDifficulty(t.id, lvl.v)}
                                 style={[s.diffPill, active && s.diffPillOn]}
                               >
-                                <Text style={[s.diffTxt, active && s.diffTxtOn]}>{lvl}</Text>
+                                <Text style={[s.diffTxt, active && s.diffTxtOn]}>{lvl.l}</Text>
                               </Pressable>
                             );
                           })}
@@ -350,9 +348,11 @@ export default function PlannerScreen() {
                               ]}
                             />
                           </View>
-                          <Text style={s.countLabel}>
-                            {t.questionsSolved}/{t.target}
-                          </Text>
+                          <View style={s.targetEditor}>
+                             <Pressable onPress={() => setTarget(t.id, t.target - 5)}><Minus size={12} color={C.textMuted} /></Pressable>
+                             <Text style={s.countLabel}>{t.questionsSolved}/{t.target}</Text>
+                             <Pressable onPress={() => setTarget(t.id, t.target + 5)}><Plus size={12} color={C.textMuted} /></Pressable>
+                          </View>
                         </View>
                       </View>
 
@@ -462,6 +462,24 @@ const s = StyleSheet.create({
   pillOn: {
     borderColor: C.accentCyan,
     backgroundColor: 'rgba(0,242,255,0.05)',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    width: 280,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+  },
+  searchIcon: { marginRight: 10 },
+  searchInput: {
+    flex: 1,
+    height: 44,
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '600',
   },
   pillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   pillTxtOn: { color: C.white },
@@ -585,7 +603,16 @@ const s = StyleSheet.create({
     overflow: 'hidden',
   },
   miniBarFill: { height: '100%', borderRadius: 3 },
-  countLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 11, fontWeight: '700', width: 45 },
+  targetEditor: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  countLabel: { color: 'rgba(255,255,255,0.5)', fontSize: 11, fontWeight: '800' },
 
   tactileControls: {
     flexDirection: 'row',
