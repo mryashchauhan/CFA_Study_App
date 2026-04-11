@@ -256,8 +256,8 @@ export default function PlannerScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={s.header}>
-          <Text style={[titleStyle, { fontSize: 34, fontWeight: '800' }]}>Study Planner</Text>
-          <Text style={[s.subtitle, { fontSize: 15, color: 'rgba(255,255,255,0.5)' }]}>Overview & Progress Tracking</Text>
+          <Text style={[TYPOGRAPHY.screenTitleTablet, { fontSize: isDesktop ? 48 : 34, fontWeight: '800' }]}>Study Planner</Text>
+          <Text style={[s.subtitle, { fontSize: isDesktop ? 18 : 15, color: 'rgba(255,255,255,0.5)' }]}>Overview & Progress Tracking</Text>
         </View>
 
         <View style={s.pills}>
@@ -392,13 +392,13 @@ export default function PlannerScreen() {
                            </Pressable>
                          </View>
 
-                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName]} numberOfLines={2}>
+                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 28 : 22 }]} numberOfLines={2}>
                            {t.topic}
                          </Text>
 
                          <View style={s.topicStatLine}>
-                            <Text style={s.progValue}>{prog}%</Text>
-                            <Text style={s.solvedSplit}>{t.questionsSolved} / {t.totalQuestions}</Text>
+                            <Text style={[s.progValue, { fontSize: isDesktop ? 36 : 28 }]}>{prog}%</Text>
+                            <Text style={[s.solvedSplit, { fontSize: isDesktop ? 16 : 14 }]}>{t.questionsSolved} / {t.totalQuestions}</Text>
                          </View>
                          
                          <View style={s.miniBarBg}>

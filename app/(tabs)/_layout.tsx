@@ -21,6 +21,8 @@ export default function TabLayout() {
           height: isWeb ? 104 : 96,
           paddingTop: 10,
           paddingBottom: isWeb ? 32 : 24,
+          alignSelf: 'center',
+          width: '100%',
         },
         tabBarItemStyle: {
           minHeight: 58,
