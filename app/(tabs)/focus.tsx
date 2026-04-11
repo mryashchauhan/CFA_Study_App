@@ -86,18 +86,21 @@ export default function FocusScreen() {
               style={s.recallInput}
             />
 
-            {recallText.length >= 10 && (
-              <Pressable onPress={submitRecall} style={({ pressed }) => [s.bigBtnWrap, pressed && { opacity: 0.85 }]}>
-                <LinearGradient
-                  colors={GRADIENTS.cta}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={s.bigBtn}
-                >
-                  <Text style={TYPOGRAPHY.buttonText}>Save to Syllabus</Text>
-                </LinearGradient>
-              </Pressable>
-            )}
+            <Pressable 
+              onPress={submitRecall} 
+              style={({ pressed }) => [s.bigBtnWrap, pressed && { opacity: 0.85 }]}
+            >
+              <LinearGradient
+                colors={GRADIENTS.cta}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={s.bigBtn}
+              >
+                <Text style={TYPOGRAPHY.buttonText}>
+                  {recallText.length > 0 ? 'Save to Syllabus' : 'Finish Session'}
+                </Text>
+              </LinearGradient>
+            </Pressable>
           </View>
         </ScrollView>
       </View>
