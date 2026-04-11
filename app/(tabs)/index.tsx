@@ -366,15 +366,15 @@ export default function PlannerScreen() {
                   const hard = t.lod === 'Hard';
                   const easy = t.lod === 'Easy';
                   
-                  let lodColor: string = 'rgba(234, 179, 8, 0.5)';
-                  let lodBg = 'rgba(234, 179, 8, 0.04)';
+                  let lodColor: string = 'rgba(234, 179, 8, 0.4)';
+                  let lodBg = 'rgba(234, 179, 8, 0.02)';
                   
                   if (hard) {
-                    lodColor = 'rgba(239, 68, 68, 0.5)';
-                    lodBg = 'rgba(239, 68, 68, 0.04)';
+                    lodColor = 'rgba(239, 68, 68, 0.4)';
+                    lodBg = 'rgba(239, 68, 68, 0.02)';
                   } else if (easy) {
-                    lodColor = 'rgba(16, 185, 129, 0.5)';
-                    lodBg = 'rgba(16, 185, 129, 0.04)';
+                    lodColor = 'rgba(16, 185, 129, 0.4)';
+                    lodBg = 'rgba(16, 185, 129, 0.02)';
                   }
                   
                   return (
@@ -485,13 +485,13 @@ const s = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: SPACING.lg,
+    marginTop: 10,
     backgroundColor: '#000',
-    padding: SPACING.md,
+    padding: 10,
     borderRadius: R.xs,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.05)',
-    gap: 12,
+    gap: 8,
   },
   statBox: { 
     alignItems: 'center', 
@@ -513,10 +513,10 @@ const s = StyleSheet.create({
   },
   statVal: { color: C.white, fontSize: 40, fontWeight: '900', lineHeight: 48, textAlign: 'center' },
   
-  pacingWrap: { marginTop: SPACING.md, alignItems: 'center' },
+  pacingWrap: { marginTop: 6, alignItems: 'center' },
   pacing: { ...TYPOGRAPHY.body, fontSize: 13, opacity: 0.7 },
   
-  barContainer: { marginTop: SPACING.lg },
+  barContainer: { marginTop: 8 },
   barBgHero: {
     height: 6,
     backgroundColor: 'rgba(255,255,255,0.03)',
@@ -532,7 +532,7 @@ const s = StyleSheet.create({
     fontWeight: '700',
   },
 
-  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, paddingLeft: SPACING.xs },
+  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 2, paddingLeft: SPACING.xs },
   sectionLabel: { marginBottom: 0, marginLeft: 8, fontSize: 16, opacity: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
 
@@ -553,7 +553,7 @@ const s = StyleSheet.create({
   topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
   lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  topicName: { marginBottom: 2, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  topicName: { marginBottom: 0, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
   
   topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
