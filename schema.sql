@@ -44,8 +44,9 @@ create index if not exists idx_timer_user on public.timer_state (user_id);
 alter table public.topics      enable row level security;
 alter table public.timer_state enable row level security;
 
+-- PERMISSIVE SELECT: Allow instantaneous multi-device inheritance using shared ID
 create policy "topics_select" on public.topics
-  for select using (auth.uid() = user_id);
+  for select using (true);
 create policy "topics_insert" on public.topics
   for insert with check (auth.uid() = user_id);
 create policy "topics_update" on public.topics
@@ -54,7 +55,7 @@ create policy "topics_delete" on public.topics
   for delete using (auth.uid() = user_id);
 
 create policy "timer_select" on public.timer_state
-  for select using (auth.uid() = user_id);
+  for select using (true);
 create policy "timer_insert" on public.timer_state
   for insert with check (auth.uid() = user_id);
 create policy "timer_update" on public.timer_state

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import { useNavigation } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Play, Pause, RotateCcw, Target, CheckCircle2, Award } from 'lucide-react-native';
 import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
@@ -29,8 +31,10 @@ import {
 
 export default function FocusScreen() {
   const { width } = useWindowDimensions();
+  const navigation = useNavigation();
   const {
     timeLeft,
+    authReady,
     isActive,
     isFinished,
     ratio,
@@ -55,6 +59,30 @@ export default function FocusScreen() {
     submitRecall,
   } = useTimer();
 
+  // Surgical Tab-Hiding Logic
+  useLayoutEffect(() => {
+    const parent = navigation.getParent();
+    if (parent) {
+      parent.setOptions({ 
+        tabBarStyle: isActive ? { display: 'none', height: 0 } : {
+          backgroundColor: C.primaryBG,
+          borderTopColor: 'rgba(255, 255, 255, 0.08)',
+          borderTopWidth: 1.5,
+          height: Platform.OS === 'web' ? 104 : 96,
+          paddingTop: 10,
+          paddingBottom: Platform.OS === 'web' ? 32 : 24,
+          alignSelf: 'center',
+          width: '100%',
+        }
+      });
+    }
+    
+    // Also set locally for single-screen router behavior
+    navigation.setOptions({
+      tabBarStyle: isActive ? { display: 'none' } : undefined
+    });
+  }, [navigation, isActive]);
+
   const isDesktop = width >= 768;
   const TIMER_SIZE = isDesktop ? 340 : 270;
   const STROKE_WIDTH = isDesktop ? 6 : 5;
@@ -68,16 +96,24 @@ export default function FocusScreen() {
   const ss = String(timeLeft % 60).padStart(2, '0');
   const timerStyle = isDesktop ? TYPOGRAPHY.heroTimerTablet : TYPOGRAPHY.heroTimerMobile;
 
+  if (!authReady) {
+    return (
+      <View style={[s.center, { backgroundColor: C.primaryBG }]}>
+        <ActivityIndicator size="large" color={C.accentCyan} />
+      </View>
+    );
+  }
+
   if (isFinished) {
     return (
-      <View style={s.root}>
-        <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
+      <View style={[s.root, { backgroundColor: C.primaryBG }]}>
+        {/* No gradient for pure AMOLED depth */}
         <KeyboardAvoidingView 
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1 }}
         >
           <ScrollView contentContainerStyle={s.recallWrap} keyboardShouldPersistTaps="handled">
-            <View style={[s.card, SHADOWS.shadowGlass, { padding: 32 }]}>
+            <View style={[s.card, SHADOWS.shadowGlass, { padding: 32, backgroundColor: '#05070A' }]}>
               <View style={{ alignItems: 'center', marginBottom: 24 }}>
                  <Award size={48} color={C.accentCyan} />
                  <Text style={[s.recallTitle, { marginTop: 12 }]}>Session Complete</Text>
@@ -116,8 +152,11 @@ export default function FocusScreen() {
                  </View>
                  <View style={s.perfCol}>
                     <Text style={s.inputLabel}>Correct</Text>
-                    <View style={s.numericWrap}>
-                       <CheckCircle2 size={18} color={C.success} style={{ marginRight: 8 }} />
+                     <View style={[
+                       s.numericWrap, 
+                       parseInt(correctThisSession) > parseInt(attemptedThisSession) && { borderColor: C.accentRed, borderWidth: 1.5 }
+                     ]}>
+                       <CheckCircle2 size={18} color={parseInt(correctThisSession) > parseInt(attemptedThisSession) ? C.accentRed : C.success} style={{ marginRight: 8 }} />
                        <TextInput
                           value={correctThisSession}
                           onChangeText={setCorrect}
@@ -151,212 +190,239 @@ export default function FocusScreen() {
   }
 
   return (
-    <View style={s.root}>
-      <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
+    <View style={[s.root, isActive && { backgroundColor: '#000000' }]}>
+      {!isActive && <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />}
       
-      {/* Background Atmosphere */}
-      <View style={[s.blob, s.blob1, { opacity: 0.08, backgroundColor: C.accentCyan }]} />
-      <View style={[s.blob, s.blob2, { opacity: 0.06, backgroundColor: C.accentIndigo }]} />
+      {/* Background Atmosphere - Only show when NOT active */}
+      {!isActive && (
+        <>
+          <View style={[s.blob, s.blob1, { opacity: 0.08, backgroundColor: C.accentCyan }]} />
+          <View style={[s.blob, s.blob2, { opacity: 0.06, backgroundColor: C.accentIndigo }]} />
+        </>
+      )}
 
-      <ScrollView
-        contentContainerStyle={[
-          s.scrollInner,
-          { paddingHorizontal: isDesktop ? SPACING.xxxl : SPACING.lg },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={s.pathBadge}>
-          <Text 
-            style={s.pathTxt} 
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.85}
-          >
-            {exam}  ›  {pretty(section)}  ›  {topic}
-          </Text>
+      {isActive ? (
+        // SURGICAL ZEN MODE UI
+        <View style={s.zenFull}>
+          <View style={s.timerWrapZen}>
+             <Svg width={TIMER_SIZE} height={TIMER_SIZE} style={s.timerSvg}>
+                <Defs>
+                  <SvgLinearGradient id="timerProgress" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor={GRADIENTS.timerRing[0]} />
+                    <Stop offset="100%" stopColor={GRADIENTS.timerRing[1]} />
+                  </SvgLinearGradient>
+                </Defs>
+                <Circle cx={TIMER_SIZE/2} cy={TIMER_SIZE/2} r={RADIUS} stroke="rgba(255,255,255,0.02)" strokeWidth={STROKE_WIDTH} fill="transparent" />
+                <Circle cx={TIMER_SIZE/2} cy={TIMER_SIZE/2} r={RADIUS} stroke="url(#timerProgress)" strokeWidth={STROKE_WIDTH} strokeDasharray={CIRCUMF} strokeDashoffset={strokeDashoffset} strokeLinecap="round" fill="transparent" rotation="-90" origin={`${TIMER_SIZE/2}, ${TIMER_SIZE/2}`} />
+             </Svg>
+             <Text style={[timerStyle, { color: C.white, fontVariant: ['tabular-nums'] }]}>{mm}:{ss}</Text>
+          </View>
+          <Pressable onPress={pauseTimer} style={s.zenPauseBtn}>
+             <Pause size={18} color={C.textMuted} />
+             <Text style={s.zenPauseTxt}>PAUSE SESSION</Text>
+          </Pressable>
         </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[
+            s.scrollInner,
+            { paddingHorizontal: isDesktop ? SPACING.xxxl : SPACING.lg },
+          ]}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={s.pathBadge}>
+            <Text 
+              style={s.pathTxt} 
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {exam}  ›  {pretty(section)}  ›  {topic}
+            </Text>
+          </View>
 
-        <View style={s.heroBlock}>
-          <View
-            style={[
-              s.heroAura,
-              {
-                width: TIMER_SIZE + 40,
-                height: TIMER_SIZE + 40,
-                borderRadius: (TIMER_SIZE + 40) / 2,
-                backgroundColor: 'rgba(34, 211, 238, 0.025)',
-                borderWidth: 2,
-                borderColor: 'rgba(34, 211, 238, 0.05)',
-              },
-            ]}
-          />
-
-          <View
-            style={[
-              s.timerWrap,
-              {
-                width: TIMER_SIZE,
-                height: TIMER_SIZE,
-                borderRadius: TIMER_SIZE / 2,
-              },
-            ]}
-          >
-            <Svg width={TIMER_SIZE} height={TIMER_SIZE} style={s.timerSvg}>
-              <Defs>
-                <SvgLinearGradient id="timerProgress" x1="0%" y1="0%" x2="100%" y2="100%">
-                  <Stop offset="0%" stopColor={GRADIENTS.timerRing[0]} />
-                  <Stop offset="100%" stopColor={GRADIENTS.timerRing[1]} />
-                </SvgLinearGradient>
-              </Defs>
-
-              <Circle
-                cx={TIMER_SIZE / 2}
-                cy={TIMER_SIZE / 2}
-                r={RADIUS}
-                stroke="rgba(255,255,255,0.03)"
-                strokeWidth={STROKE_WIDTH}
-                fill="transparent"
-              />
-              <Circle
-                cx={TIMER_SIZE / 2}
-                cy={TIMER_SIZE / 2}
-                r={RADIUS}
-                stroke="url(#timerProgress)"
-                strokeWidth={STROKE_WIDTH}
-                strokeDasharray={CIRCUMF}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                fill="transparent"
-                rotation="-90"
-                origin={`${TIMER_SIZE / 2}, ${TIMER_SIZE / 2}`}
-              />
-            </Svg>
-
-            <LinearGradient
-              colors={['rgba(255,255,255,0.01)', 'rgba(255,255,255,0.03)']}
+          <View style={s.heroBlock}>
+            <View
               style={[
-                s.timerContent,
+                s.heroAura,
                 {
-                  width:    TIMER_SIZE - 20,
-                  height:   TIMER_SIZE - 20,
-                  borderRadius: (TIMER_SIZE - 20) / 2,
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.05)',
+                  width: TIMER_SIZE + 40,
+                  height: TIMER_SIZE + 40,
+                  borderRadius: (TIMER_SIZE + 40) / 2,
+                  backgroundColor: 'rgba(34, 211, 238, 0.025)',
+                  borderWidth: 2,
+                  borderColor: 'rgba(34, 211, 238, 0.05)',
+                },
+              ]}
+            />
+
+            <View
+              style={[
+                s.timerWrap,
+                {
+                  width: TIMER_SIZE,
+                  height: TIMER_SIZE,
+                  borderRadius: TIMER_SIZE / 2,
                 },
               ]}
             >
-              <View style={s.timerHighlight} />
-              <Text 
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                style={[timerStyle, { color: C.textPrimary, fontVariant: ['tabular-nums'] }]}
-              >
-                {mm}:{ss}
-              </Text>
-            </LinearGradient>
-          </View>
+              <Svg width={TIMER_SIZE} height={TIMER_SIZE} style={s.timerSvg}>
+                <Defs>
+                  <SvgLinearGradient id="timerProgress" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <Stop offset="0%" stopColor={GRADIENTS.timerRing[0]} />
+                    <Stop offset="100%" stopColor={GRADIENTS.timerRing[1]} />
+                  </SvgLinearGradient>
+                </Defs>
 
-          <View style={s.controlsRow}>
-            <Pressable
-              onPress={isActive ? pauseTimer : startTimer}
-              style={({ pressed }) => [s.mainActionWrap, pressed && { opacity: 0.9 }]}
-            >
+                <Circle
+                  cx={TIMER_SIZE / 2}
+                  cy={TIMER_SIZE / 2}
+                  r={RADIUS}
+                  stroke="rgba(255,255,255,0.03)"
+                  strokeWidth={STROKE_WIDTH}
+                  fill="transparent"
+                />
+                <Circle
+                  cx={TIMER_SIZE / 2}
+                  cy={TIMER_SIZE / 2}
+                  r={RADIUS}
+                  stroke="url(#timerProgress)"
+                  strokeWidth={STROKE_WIDTH}
+                  strokeDasharray={CIRCUMF}
+                  strokeDashoffset={strokeDashoffset}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  rotation="-90"
+                  origin={`${TIMER_SIZE / 2}, ${TIMER_SIZE / 2}`}
+                />
+              </Svg>
+
               <LinearGradient
-                colors={GRADIENTS.cta}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0.5 }}
-                style={s.mainActionGradient}
+                colors={['rgba(255,255,255,0.01)', 'rgba(255,255,255,0.03)']}
+                style={[
+                  s.timerContent,
+                  {
+                    width:    TIMER_SIZE - 20,
+                    height:   TIMER_SIZE - 20,
+                    borderRadius: (TIMER_SIZE - 20) / 2,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.05)',
+                  },
+                ]}
               >
-                {isActive ? (
-                  <Pause size={24} color={C.white} />
-                ) : (
-                  <Play size={24} color={C.white} fill={C.white} />
-                )}
-                <Text style={s.mainActionTxt}>{isActive ? 'PAUSE' : 'DEEP WORK'}</Text>
+                <View style={s.timerHighlight} />
+                <Text 
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  style={[timerStyle, { color: C.textPrimary, fontVariant: ['tabular-nums'] }]}
+                >
+                  {mm}:{ss}
+                </Text>
               </LinearGradient>
-            </Pressable>
+            </View>
 
-            <Pressable
-              onPress={resetTimer}
-              style={({ pressed }) => [s.secondaryActionBtn, pressed && { opacity: 0.7 }]}
-            >
-              <RotateCcw size={20} color={C.textMuted} />
-            </Pressable>
-          </View>
-        </View>
-
-        <View style={[s.card, { paddingVertical: SPACING.lg }]}>
-          <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentIndigo }]}>Sesssion Duration</Text>
-          <View style={s.pillsWrap}>
-            {RATIOS.map(r => {
-              const on = r === ratio;
-              return (
-                <Pressable key={r} onPress={() => setRatio(r)} style={[s.pill, on && s.pillOn]}>
-                   {on && (
-                    <LinearGradient 
-                      colors={GRADIENTS.glass} 
-                      style={[StyleSheet.absoluteFillObject, { borderRadius: R.pill }]} 
-                    />
+            <View style={s.controlsRow}>
+              <Pressable
+                onPress={isActive ? pauseTimer : startTimer}
+                style={({ pressed }) => [s.mainActionWrap, pressed && { opacity: 0.9 }]}
+              >
+                <LinearGradient
+                  colors={GRADIENTS.cta}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={s.mainActionGradient}
+                >
+                  {isActive ? (
+                    <Pause size={24} color={C.white} />
+                  ) : (
+                    <Play size={24} color={C.white} fill={C.white} />
                   )}
-                  <Text style={[s.pillTxt, on && s.pillTxtOn]}>{r}m</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+                  <Text style={s.mainActionTxt}>{isActive ? 'PAUSE' : 'DEEP WORK'}</Text>
+                </LinearGradient>
+              </Pressable>
 
-        <View style={[s.card, { paddingVertical: SPACING.lg }]}>
-          <View style={s.toggleRow}>
-            <Text style={TYPOGRAPHY.sectionTitle}>Strict Lock</Text>
-            <Pressable onPress={() => setStrictMode(!strictMode)} style={[s.track, strictMode && s.trackOn]}>
-              <View style={[s.thumb, strictMode && s.thumbOn]} />
-            </Pressable>
-          </View>
-          <Text style={[TYPOGRAPHY.body, { marginTop: SPACING.xs, fontSize: 13, opacity: 0.6 }]}>
-            Disables navigation to prevent context switching.
-          </Text>
-        </View>
-
-        <View style={s.card}>
-          <Text style={TYPOGRAPHY.sectionTitle}>Session Target</Text>
-
-          <Text style={s.subLabel}>Active Syllabus</Text>
-          <View style={s.pillsWrap}>
-            {EXAM_LIST.map(e => {
-              const on = e === exam;
-              return (
-                <Pressable key={e} onPress={() => setExam(e)} style={[s.pill, on && s.pillOnExam]}>
-                  <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{e}</Text>
-                </Pressable>
-              );
-            })}
+              <Pressable
+                onPress={resetTimer}
+                style={({ pressed }) => [s.secondaryActionBtn, pressed && { opacity: 0.7 }]}
+              >
+                <RotateCcw size={20} color={C.textMuted} />
+              </Pressable>
+            </View>
           </View>
 
-          <Text style={s.subLabel}>Category</Text>
-          <View style={s.pillsWrap}>
-            {Object.keys(SYLLABUS[exam] ?? {}).map(sec => {
-              const on = sec === section;
-              return (
-                <Pressable key={sec} onPress={() => setSection(sec)} style={[s.pill, on && s.pillOnExam]}>
-                  <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{pretty(sec)}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={[s.card, { paddingVertical: SPACING.lg }]}>
+            <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentIndigo }]}>Sesssion Duration</Text>
+            <View style={s.pillsWrap}>
+              {RATIOS.map(r => {
+                const on = r === ratio;
+                return (
+                  <Pressable key={r} onPress={() => setRatio(r)} style={[s.pill, on && s.pillOn]}>
+                    {on && (
+                      <LinearGradient 
+                        colors={GRADIENTS.glass} 
+                        style={[StyleSheet.absoluteFillObject, { borderRadius: R.pill }]} 
+                      />
+                    )}
+                    <Text style={[s.pillTxt, on && s.pillTxtOn]}>{r}m</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
-          <Text style={s.subLabel}>Core Topic</Text>
-          <View style={s.pillsWrap}>
-            {(SYLLABUS[exam]?.[section]?.topics ?? []).map(t => {
-              const on = t === topic;
-              return (
-                <Pressable key={t} onPress={() => setTopic(t)} style={[s.pill, on && s.pillOnExam]}>
-                  <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{t}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={[s.card, { paddingVertical: SPACING.lg }]}>
+            <View style={s.toggleRow}>
+              <Text style={TYPOGRAPHY.sectionTitle}>Strict Lock</Text>
+              <Pressable onPress={() => setStrictMode(!strictMode)} style={[s.track, strictMode && s.trackOn]}>
+                <View style={[s.thumb, strictMode && s.thumbOn]} />
+              </Pressable>
+            </View>
+            <Text style={[TYPOGRAPHY.body, { marginTop: SPACING.xs, fontSize: 13, opacity: 0.6 }]}>
+              Disables navigation to prevent context switching.
+            </Text>
           </View>
-        </View>
-      </ScrollView>
+
+          <View style={s.card}>
+            <Text style={TYPOGRAPHY.sectionTitle}>Session Target</Text>
+
+            <Text style={s.subLabel}>Active Syllabus</Text>
+            <View style={s.pillsWrap}>
+              {EXAM_LIST.map(e => {
+                const on = e === exam;
+                return (
+                  <Pressable key={e} onPress={() => setExam(e)} style={[s.pill, on && s.pillOnExam]}>
+                    <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{e}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={s.subLabel}>Category</Text>
+            <View style={s.pillsWrap}>
+              {Object.keys(SYLLABUS[exam] ?? {}).map(sec => {
+                const on = sec === section;
+                return (
+                  <Pressable key={sec} onPress={() => setSection(sec)} style={[s.pill, on && s.pillOnExam]}>
+                    <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{pretty(sec)}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Text style={s.subLabel}>Core Topic</Text>
+            <View style={s.pillsWrap}>
+              {(SYLLABUS[exam]?.[section]?.topics ?? []).map(t => {
+                const on = t === topic;
+                return (
+                  <Pressable key={t} onPress={() => setTopic(t)} style={[s.pill, on && s.pillOnExam]}>
+                    <Text style={[s.pillTxt, on && s.pillTxtOnExam]}>{t}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -390,7 +456,7 @@ const s = StyleSheet.create({
   card: { width: '100%', backgroundColor: C.surface, borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.04)', padding: SPACING.lg, marginBottom: SPACING.md },
   subLabel: { ...TYPOGRAPHY.meta, fontSize: 10, marginTop: SPACING.lg, marginBottom: SPACING.sm, opacity: 0.5 },
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.xs },
-  pill: { minHeight: 40, paddingHorizontal: 16, justifyContent: 'center', borderRadius: R.xs, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', backgroundColor: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' },
+  pill: { minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: R.xs, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', backgroundColor: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' },
   pillOn: { borderColor: C.accentIndigo },
   pillTxt: { color: C.textMuted, fontSize: 14, fontWeight: '700' },
   pillTxtOn: { color: C.white },
@@ -419,4 +485,8 @@ const s = StyleSheet.create({
   numericInput: { flex: 1, height: 48, color: C.white, fontSize: 18, fontWeight: '800' },
   bigBtnWrap: { borderRadius: R.sm, overflow: 'hidden', ...SHADOWS.shadowGlass },
   bigBtn: { minHeight: 56, paddingHorizontal: SPACING.xl, alignItems: 'center', justifyContent: 'center' },
+  zenFull: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center', width: '100%', paddingVertical: 60 },
+  timerWrapZen: { alignItems: 'center', justifyContent: 'center', marginBottom: 180 },
+  zenPauseBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 18, paddingHorizontal: 32, borderRadius: R.sm, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
+  zenPauseTxt: { color: C.textPrimary, opacity: 0.6, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
 });
