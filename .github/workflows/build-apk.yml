@@ -27,6 +27,13 @@ jobs:
       - name: 🛠 Prebuild
         run: npx expo prebuild --platform android --no-install
 
+      - name: 🧠 Configure Gradle Memory
+        run: |
+          mkdir -p ~/.gradle
+          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError" >> ~/.gradle/gradle.properties
+          echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
+          echo "org.gradle.parallel=false" >> ~/.gradle/gradle.properties
+
       - name: 🚀 Build APK
         run: |
           cd android
