@@ -18,10 +18,10 @@ export default function GoogleAuthLanding() {
 
   useEffect(() => {
     // Wait for the background handshake to complete definitively
-    if (authReady && userEmail) {
+    if (authReady) {
       router.replace('/(tabs)');
     }
-  }, [authReady, userEmail]);
+  }, [authReady]);
 
   return (
     <View style={s.container}>
