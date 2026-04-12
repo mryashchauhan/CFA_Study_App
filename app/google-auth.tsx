@@ -1,6 +1,7 @@
 import { C } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { useTimer } from '@/lib/TimerContext';
 import React, { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
@@ -11,15 +12,14 @@ import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
  */
 export default function GoogleAuthLanding() {
   const router = useRouter();
-  const { authReady, userEmail } = useTimer();
+  const timer = useTimer();
+  const authReady = timer?.authReady;
+  const userEmail = timer?.userEmail;
 
   useEffect(() => {
     // Wait for the background handshake to complete definitively
     if (authReady && userEmail) {
-      const timer = setTimeout(() => {
-        router.replace('/(tabs)');
-      }, 1000);
-      return () => clearTimeout(timer);
+      router.replace('/(tabs)');
     }
   }, [authReady, userEmail]);
 
