@@ -12,7 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
  */
 export default function GoogleAuthLanding() {
   const router = useRouter();
-  const { authReady, userEmail } = useTimer();
+  const timer = useTimer();
+  if (!timer || !timer.signInWithGoogle) return null;
+  const { authReady, userEmail } = timer;
 
   useEffect(() => {
     // Wait for the background handshake to complete definitively
