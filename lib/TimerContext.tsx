@@ -280,7 +280,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        channelRef.current = ch;
+        topicsChannelRef.current = ch;
       } catch (err) {
         console.warn('v1.4.0 Sync Error:', err);
       }

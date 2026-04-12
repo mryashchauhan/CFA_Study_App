@@ -105,14 +105,27 @@ export default function PlannerScreen() {
     : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
 
   useEffect(() => {
+    if (!authReady) return;
+
     if (globalTopics && globalTopics.length > 0) {
       setTopics(globalTopics);
       setLoading(false);
-    } else if (authReady) {
-      // If we are auth-ready but have no topics, we might be loading or need seeding
+    } else if (globalTopics && globalTopics.length === 0) {
+      // Sync finished successfully but returned zero results (New User)
+      const initSyllabus = async () => {
+        if (userId) {
+          console.log("R1 Seeding: Initializing core CFA modules...");
+          await seedTopics(userId, exam);
+          // Seeding will trigger the Realtime sync, topics will update naturally
+        }
+        setLoading(false);
+      };
+      initSyllabus();
+    } else {
+      // Auth is ready but globalTopics is still undefined/null (Sync pending)
       setLoading(true);
     }
-  }, [globalTopics, authReady]);
+  }, [globalTopics, authReady, userId, exam]);
 
   const bump = useCallback(
     async (id: string, delta: number) => {
