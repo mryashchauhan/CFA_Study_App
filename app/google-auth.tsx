@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTimer } from '@/lib/TimerContext';
 import { C } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
 
