@@ -31,6 +31,7 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
+          sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' app/build.gradle
           ./gradlew assembleRelease
 
       - name: 📤 Upload Artifact
