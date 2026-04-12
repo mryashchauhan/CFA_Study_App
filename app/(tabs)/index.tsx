@@ -101,12 +101,12 @@ export default function PlannerScreen() {
     : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
 
   useEffect(() => {
+    if (!authReady) return;
+
+    setLoading(false);
+
     if (globalTopics && globalTopics.length > 0) {
       setTopics(globalTopics);
-      setLoading(false);
-    } else if (authReady) {
-      // If we are auth-ready but have no topics, we might be loading or need seeding
-      setLoading(true);
     }
   }, [globalTopics, authReady]);
 
