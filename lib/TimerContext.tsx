@@ -1,3 +1,8 @@
+import { EXAM_LIST, ExamType, SYLLABUS } from '@/constants/theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, {
   createContext,
   useCallback,
@@ -6,13 +11,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { AppState, AppStateStatus, Alert, Platform, Share } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
-import { supabase, ensureAuth } from './supabaseClient';
-import { SYLLABUS, ExamType, EXAM_LIST } from '@/constants/theme';
+import { Alert, AppState, AppStateStatus, Platform, Share } from 'react-native';
+import { ensureAuth, supabase } from './supabaseClient';
 
 /* ────────────────────────────────────────────────────
    Types
@@ -37,26 +37,26 @@ export interface TimerCtx {
   attemptedThisSession: string;
   correctThisSession: string;
   /* actions */
-  setRatio:      (r: number)  => void;
-  setExam:       (e: ExamType) => void;
-  setSection:    (s: string)  => void;
-  setTopic:      (t: string)  => void;
+  setRatio: (r: number) => void;
+  setExam: (e: ExamType) => void;
+  setSection: (s: string) => void;
+  setTopic: (t: string) => void;
   setStrictMode: (v: boolean) => Promise<void>;
-  setRecallText: (t: string)  => void;
-  setAttempted:  (t: string)  => void;
-  setCorrect:    (t: string)  => void;
-  startTimer:    () => void;
-  pauseTimer:    () => void;
-  resetTimer:    () => void;
-  submitRecall:  () => Promise<void>;
-  refreshAuth:   () => void;
+  setRecallText: (t: string) => void;
+  setAttempted: (t: string) => void;
+  setCorrect: (t: string) => void;
+  startTimer: () => void;
+  pauseTimer: () => void;
+  resetTimer: () => void;
+  submitRecall: () => Promise<void>;
+  refreshAuth: () => void;
   signInWithGoogle: () => Promise<void>;
-  signOut:       () => Promise<void>;
-  forceMerge:    () => Promise<void>;
-  manualMerge:   (oldId: string) => Promise<void>;
-  handleSync:    () => Promise<void>;
-  userEmail:     string | null;
-  topics:        any[];
+  signOut: () => Promise<void>;
+  forceMerge: () => Promise<void>;
+  manualMerge: (oldId: string) => Promise<void>;
+  handleSync: () => Promise<void>;
+  userEmail: string | null;
+  topics: any[];
 }
 
 const Ctx = createContext<TimerCtx | null>(null);
@@ -77,10 +77,10 @@ WebBrowser.maybeCompleteAuthSession();
    ──────────────────────────────────────────────────── */
 export function TimerProvider({ children }: { children: React.ReactNode }) {
   /* ── auth ─────────────────────────── */
-  const [userId, setUserId]       = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [topics, setTopics]       = useState<any[]>([]); // Centralized study topics
+  const [topics, setTopics] = useState<any[]>([]); // Centralized study topics
   const topicsChannelRef = useRef<any>(null); // Track active topics channel
   const timerChannelRef = useRef<any>(null); // Track timer state channel
   const authLock = useRef(false);
@@ -88,24 +88,24 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   /* ── timer state ──────────────────── */
-  const defaultExam    = EXAM_LIST[0];
+  const defaultExam = EXAM_LIST[0];
   const defaultSection = Object.keys(SYLLABUS[defaultExam])[0];
-  const defaultTopic   = SYLLABUS[defaultExam][defaultSection].topics[0];
+  const defaultTopic = SYLLABUS[defaultExam][defaultSection].topics[0];
 
-  const [exam, setExamRaw]        = useState<ExamType>(defaultExam);
-  const [section, setSectionRaw]  = useState(defaultSection);
-  const [topic, setTopicRaw]      = useState(defaultTopic);
-  const [ratio, setRatioRaw]      = useState(25);
-  const [timeLeft, setTimeLeft]   = useState(25 * 60);
-  const [isActive, setIsActive]   = useState(false);
+  const [exam, setExamRaw] = useState<ExamType>(defaultExam);
+  const [section, setSectionRaw] = useState(defaultSection);
+  const [topic, setTopicRaw] = useState(defaultTopic);
+  const [ratio, setRatioRaw] = useState(25);
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [isActive, setIsActive] = useState(false);
   const [isFinished, setFinished] = useState(false);
-  const [strictMode, setStrictRaw]= useState(false);
-  const [recallText, setRecall]   = useState('');
+  const [strictMode, setStrictRaw] = useState(false);
+  const [recallText, setRecall] = useState('');
   const [attempted, setAttempted] = useState('0');
-  const [correct, setCorrect]     = useState('0');
+  const [correct, setCorrect] = useState('0');
 
-  const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const syncLock  = useRef(false);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const syncLock = useRef(false);
   const activeRef = useRef(isActive);
   activeRef.current = isActive;
 
@@ -121,11 +121,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     try {
       const saved = await AsyncStorage.getItem('strictMode');
       if (saved !== null && mounted) setStrictRaw(JSON.parse(saved));
-    } catch (e) {}
+    } catch (e) { }
 
     try {
       setAuthReady(false);
-      
+
       // 1. Sync Override (Zero-Input Cross-Device Handshake)
       let currentSync = sync;
       let currentRT = rt;
@@ -134,28 +134,28 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           const params = new URLSearchParams(window.location.search);
           currentSync = params.get('sync') || undefined;
           currentRT = params.get('rt') || undefined;
-        } catch (e) {}
+        } catch (e) { }
       }
 
       if (currentSync && mounted) {
         if (currentRT) {
           try {
-            const { data: { user } } = await supabase.auth.setSession({ 
-              access_token: '', 
-              refresh_token: currentRT 
+            const { data: { user } } = await supabase.auth.setSession({
+              access_token: '',
+              refresh_token: currentRT
             });
             if (user) {
               setUserId(user.id);
               setAuthReady(true);
-              try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) {}
+              try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) { }
               return;
             }
-          } catch (e) {}
+          } catch (e) { }
         }
-        await AsyncStorage.setItem('supabase.auth.token', JSON.stringify({ user: { id: currentSync } })); 
+        await AsyncStorage.setItem('supabase.auth.token', JSON.stringify({ user: { id: currentSync } }));
         setUserId(currentSync);
         setAuthReady(true);
-        try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) {}
+        try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) { }
         return;
       }
 
@@ -171,13 +171,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             await mergeIdentity(oldId, newId);
             await AsyncStorage.removeItem('merge_from_id');
           }
-        } catch (e) {}
-        
+        } catch (e) { }
+
         setUserId(newId);
         setAuthReady(true);
         return;
       }
-      
+
       setUserEmail(null);
 
       // 3. Fallback to Anonymous
@@ -280,7 +280,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        topicsChannelRef.current = ch;
+        channelRef.current = ch;
       } catch (err) {
         console.warn('v1.4.0 Sync Error:', err);
       }
@@ -324,15 +324,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         const endTime = active ? new Date(now.getTime() + remaining * 1000).toISOString() : null;
         await supabase.from('timer_state').upsert(
           {
-            user_id:           userId,
-            is_active:         active,
+            user_id: userId,
+            is_active: active,
             remaining_seconds: remaining,
-            end_time:          endTime,
-            duration_seconds:  stateRef.current.ratio * 60,
-            exam:              stateRef.current.exam,
-            section:           stateRef.current.section,
-            topic:             stateRef.current.topic,
-            updated_at:        now.toISOString(),
+            end_time: endTime,
+            duration_seconds: stateRef.current.ratio * 60,
+            exam: stateRef.current.exam,
+            section: stateRef.current.section,
+            topic: stateRef.current.topic,
+            updated_at: now.toISOString(),
           },
           { onConflict: 'user_id' },
         );
@@ -377,9 +377,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             setIsActive(false);
           }
           if (data.duration_seconds) setRatioRaw(Math.round(data.duration_seconds / 60));
-          if (data.exam)    setExamRaw(data.exam);
+          if (data.exam) setExamRaw(data.exam);
           if (data.section) setSectionRaw(data.section);
-          if (data.topic)   setTopicRaw(data.topic);
+          if (data.topic) setTopicRaw(data.topic);
           setTimeout(() => { syncLock.current = false; }, 600);
         }
       } catch (error) {
@@ -414,13 +414,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             setIsActive(false);
           }
           if (d.duration_seconds) setRatioRaw(Math.round(d.duration_seconds / 60));
-          if (d.exam)    setExamRaw(d.exam);
+          if (d.exam) setExamRaw(d.exam);
           if (d.section) setSectionRaw(d.section);
-          if (d.topic)   setTopicRaw(d.topic);
+          if (d.topic) setTopicRaw(d.topic);
           setTimeout(() => { syncLock.current = false; }, 800);
         },
       ).subscribe();
-    
+
     timerChannelRef.current = channel;
 
     return () => { supabase.removeChannel(channel); };
@@ -532,7 +532,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         }).eq('id', topicRow.id);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     setFinished(false);
     setRecall('');
@@ -551,16 +551,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       if (oldTopics && oldTopics.length > 0) {
         for (const t of oldTopics) {
           const { id, created_at, updated_at, ...rest } = t;
-          await supabase.from('topics').upsert({ 
-            ...rest, 
-            user_id: newId, 
-            updated_at: new Date().toISOString() 
+          await supabase.from('topics').upsert({
+            ...rest,
+            user_id: newId,
+            updated_at: new Date().toISOString()
           }, { onConflict: 'user_id,exam,section,topic' });
         }
         // Cleanup old anonymous rows
         await supabase.from('topics').delete().eq('user_id', oldId);
       }
-      
+
       // 2. Move timer state
       const { data: oldTimer } = await supabase.from('timer_state').select('*').eq('user_id', oldId).maybeSingle();
       if (oldTimer) {
@@ -572,23 +572,23 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         }, { onConflict: 'user_id' });
         await supabase.from('timer_state').delete().eq('user_id', oldId);
       }
-    } catch (e) {}
+    } catch (e) { }
   };
-  
+
   const handleSync = async () => {
     Alert.alert(
       'Sync Workspace',
       'This MAGIC LINK will instantly pair your other device to this study history without any login.\n\nInstructions:\n1. Share this link to your laptop/other device.\n2. Open it there to sync everything.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Generate Link', 
+        {
+          text: 'Generate Link',
           onPress: async () => {
             try {
               const { data: { session } } = await supabase.auth.getSession();
-              const rt = session?.refresh_token;              
+              const rt = session?.refresh_token;
               const syncURL = `https://cfa-study-app-self.vercel.app/?sync=${userId}${rt ? `&rt=${rt}` : ''}`;
-              
+
               await Share.share({
                 message: syncURL,
                 url: syncURL,
@@ -596,7 +596,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
             } catch (error: any) {
               Alert.alert('Sharing Error', 'Unable to generate sync link at this time.');
             }
-          } 
+          }
         }
       ]
     );
@@ -608,13 +608,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // Cache the current ID as a source for the upcoming identity merge
         await AsyncStorage.setItem('merge_from_id', userId);
       }
-    } catch (e) {}
+    } catch (e) { }
 
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: Platform.OS === 'web' 
-          ? window.location.origin 
+        redirectTo: Platform.OS === 'web'
+          ? window.location.origin
           : 'cfastudyapp://google-auth', // Points to our new dedicated landing pad
         skipBrowserRedirect: true,
       },
@@ -645,7 +645,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    setUserId(null); 
+    setUserId(null);
     setUserEmail(null);
     setAuthReady(false);
     loadAll(true);
@@ -662,7 +662,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       } else {
         Alert.alert('Sync Check', 'Your study data is already up to date.');
       }
-    } catch (e) {}
+    } catch (e) { }
   };
 
   const manualMerge = async (oldId: string) => {
@@ -699,7 +699,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setRatio, setExam, setSection, setTopic, setRecallText: setRecall, setAttempted, setCorrect,
         setStrictMode: async (v: boolean) => {
           setStrictRaw(v);
-          try { await AsyncStorage.setItem('strictMode', JSON.stringify(v)); } catch (e) {}
+          try { await AsyncStorage.setItem('strictMode', JSON.stringify(v)); } catch (e) { }
         },
         startTimer, pauseTimer, resetTimer, submitRecall, refreshAuth: () => loadAll(true),
         signInWithGoogle, signOut, forceMerge, manualMerge, handleSync, userEmail, userId, topics,

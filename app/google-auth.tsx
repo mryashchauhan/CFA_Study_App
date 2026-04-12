@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useTimer } from '@/lib/TimerContext';
 import { C } from '@/constants/theme';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import React, { useEffect } from 'react';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 /**
  * google-auth Landing Pad
@@ -12,9 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
  */
 export default function GoogleAuthLanding() {
   const router = useRouter();
-  const timer = useTimer();
-  if (!timer || !timer.signInWithGoogle) return null;
-  const { authReady, userEmail } = timer;
+  const { authReady, userEmail } = useTimer();
 
   useEffect(() => {
     // Wait for the background handshake to complete definitively

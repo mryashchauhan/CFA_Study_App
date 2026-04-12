@@ -1,46 +1,42 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  useWindowDimensions,
-  ActivityIndicator,
-  Pressable,
-  Platform,
-  Share,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { 
-  Plus,
-  Minus,
-  ClipboardList, 
-  LayoutGrid, 
-  Search, 
-  X, 
-  RefreshCcw, 
-  Zap, 
-  Check, 
-  WifiOff,
-} from 'lucide-react-native';
-import { TextInput } from 'react-native';
-import { supabase } from '@/lib/supabaseClient';
-import { useTimer } from '@/lib/TimerContext';
 import {
   C,
-  R,
-  SPACING,
-  TYPOGRAPHY,
-  SHADOWS,
-  GRADIENTS,
-  SYLLABUS,
-  EXAM_LIST,
   EXAM_DATES,
+  EXAM_LIST,
   ExamType,
+  GRADIENTS,
   pretty,
+  R,
+  SHADOWS,
+  SPACING,
+  SYLLABUS,
+  TYPOGRAPHY,
 } from '@/constants/theme';
+import { supabase } from '@/lib/supabaseClient';
+import { useTimer } from '@/lib/TimerContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import {
+  LayoutGrid,
+  Minus,
+  Plus,
+  RefreshCcw,
+  Search,
+  WifiOff,
+  Zap
+} from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  useWindowDimensions,
+  View
+} from 'react-native';
 
 interface Topic {
   id: string;
@@ -77,7 +73,7 @@ async function seedTopics(uid: string, exam: ExamType) {
 }
 
 export default function PlannerScreen() {
-  const { 
+  const {
     userId, authReady, exam, setExam, topics: globalTopics, userEmail
   } = useTimer();
   const { width } = useWindowDimensions();
@@ -94,10 +90,10 @@ export default function PlannerScreen() {
   const isDesktop = width >= 1200;
   const isTablet = width >= 768 && width < 1200;
   const numCols = isDesktop ? 3 : isTablet ? 2 : 1;
-  
+
   const CONTENT_MAX_W = 1100;
   const effectiveWidth = Math.min(width, CONTENT_MAX_W);
-  
+
   const pad = isDesktop ? SPACING.xl : SPACING.lg;
   const gap = SPACING.md;
   const cardW = numCols === 1
@@ -105,27 +101,14 @@ export default function PlannerScreen() {
     : (effectiveWidth - pad * 2 - gap * (numCols - 1)) / numCols;
 
   useEffect(() => {
-    if (!authReady) return;
-
     if (globalTopics && globalTopics.length > 0) {
       setTopics(globalTopics);
       setLoading(false);
-    } else if (globalTopics && globalTopics.length === 0) {
-      // Sync finished successfully but returned zero results (New User)
-      const initSyllabus = async () => {
-        if (userId) {
-          console.log("R1 Seeding: Initializing core CFA modules...");
-          await seedTopics(userId, exam);
-          // Seeding will trigger the Realtime sync, topics will update naturally
-        }
-        setLoading(false);
-      };
-      initSyllabus();
-    } else {
-      // Auth is ready but globalTopics is still undefined/null (Sync pending)
+    } else if (authReady) {
+      // If we are auth-ready but have no topics, we might be loading or need seeding
       setLoading(true);
     }
-  }, [globalTopics, authReady, userId, exam]);
+  }, [globalTopics, authReady]);
 
   const bump = useCallback(
     async (id: string, delta: number) => {
@@ -138,9 +121,9 @@ export default function PlannerScreen() {
           return { ...t, questionsSolved: v };
         }),
       );
-      
+
       await new Promise(res => setTimeout(res, 50));
-      
+
       try {
         await supabase
           .from('topics')
@@ -169,13 +152,13 @@ export default function PlannerScreen() {
     [topics],
   );
 
-  const totalQ   = topics.reduce((s, t) => s + t.totalQuestions, 0);
-  const solved   = topics.reduce((s, t) => s + t.questionsSolved, 0);
-  const remain   = totalQ - solved;
+  const totalQ = topics.reduce((s, t) => s + t.totalQuestions, 0);
+  const solved = topics.reduce((s, t) => s + t.questionsSolved, 0);
+  const remain = totalQ - solved;
   const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
-  const daily    = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
-  const pct      = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
+  const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
+  const pct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
   const processed = topics.filter(t =>
@@ -193,16 +176,16 @@ export default function PlannerScreen() {
       'This MAGIC LINK will instantly pair your other device to this study history without any login.\n\nInstructions:\n1. Share this link to your laptop/other device.\n2. Open it there to sync everything.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Generate Link', 
+        {
+          text: 'Generate Link',
           onPress: async () => {
             try {
               // Fetch the current secure session tokens for the handshake
               const { data: { session } } = await supabase.auth.getSession();
               const rt = session?.refresh_token;
-              
+
               const syncURL = `https://cfa-study-app-self.vercel.app/?sync=${userId}${rt ? `&rt=${rt}` : ''}`;
-              
+
               await Share.share({
                 message: syncURL, // NO TEXT PREFIX - Ensures browsers open ONLY the URL
                 url: syncURL,
@@ -233,7 +216,7 @@ export default function PlannerScreen() {
         <Text style={[TYPOGRAPHY.body, { textAlign: 'center', opacity: 0.6, marginBottom: SPACING.xxl }]}>
           Unable to establish a secure session with the syllabus database. Please check your internet connection.
         </Text>
-        <Pressable 
+        <Pressable
           onPress={refreshAuth}
           style={({ pressed }) => [s.retryBtn, pressed && { opacity: 0.8 }]}
         >
@@ -251,15 +234,15 @@ export default function PlannerScreen() {
   return (
     <View style={s.root}>
       <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
-      
+
       {/* Background Atmosphere - Obsidians */}
       <View style={[s.blob, s.blob1, { opacity: 0.02 }]} />
-      
-      <ScrollView 
+
+      <ScrollView
         contentContainerStyle={[
-          s.scroll, 
+          s.scroll,
           { paddingHorizontal: pad, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' }
-        ]} 
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -279,9 +262,9 @@ export default function PlannerScreen() {
                 ]}
               >
                 {on && (
-                  <LinearGradient 
-                    colors={GRADIENTS.glass} 
-                    style={[StyleSheet.absoluteFillObject, { borderRadius: R.xs }]} 
+                  <LinearGradient
+                    colors={GRADIENTS.glass}
+                    style={[StyleSheet.absoluteFillObject, { borderRadius: R.xs }]}
                   />
                 )}
                 <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
@@ -297,8 +280,8 @@ export default function PlannerScreen() {
           />
           <View style={s.heroHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-               <Zap size={20} color={C.accentCyan} />
-               <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
+              <Zap size={20} color={C.accentCyan} />
+              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
             </View>
             <View style={s.heroBadge}>
               <Text style={s.badgeTxt}>
@@ -319,9 +302,9 @@ export default function PlannerScreen() {
               <View key={lbl} style={s.statBox}>
                 <Text style={s.statLbl}>{lbl}</Text>
                 <View style={s.valContainer}>
-                  <Text 
-                    numberOfLines={1} 
-                    adjustsFontSizeToFit 
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
                     style={s.statVal}
                   >
                     {val}
@@ -332,9 +315,9 @@ export default function PlannerScreen() {
           </View>
 
           <View style={s.pacingWrap}>
-             <Text style={s.pacing}>
-               Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
-             </Text>
+            <Text style={s.pacing}>
+              Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
+            </Text>
           </View>
 
           <View style={[s.barContainer, { flexDirection: 'row', alignItems: 'center' }]}>
@@ -373,10 +356,10 @@ export default function PlannerScreen() {
                     : 0;
                   const hard = t.lod === 'Hard';
                   const easy = t.lod === 'Easy';
-                  
+
                   let lodColor: string = C.warning;
                   let lodBg = 'rgba(245, 158, 11, 0.05)';
-                  
+
                   if (hard) {
                     lodColor = C.accentRed;
                     lodBg = 'rgba(239, 68, 68, 0.08)';
@@ -387,7 +370,7 @@ export default function PlannerScreen() {
 
                   return (
                     <View key={t.id} style={{ width: cardW }}>
-                       <Pressable 
+                      <Pressable
                         onPress={() => {
                           setExam(selectedExam);
                           setSection(t.section);
@@ -395,60 +378,60 @@ export default function PlannerScreen() {
                           router.push('/focus');
                         }}
                         style={({ pressed }) => [
-                          s.topicCard, 
+                          s.topicCard,
                           hard && { borderColor: 'rgba(239, 68, 68, 0.2)' },
                           pressed && { opacity: 0.9, backgroundColor: 'rgba(255,255,255,0.02)' }
                         ]}
-                       >
-                         <View style={s.topicHead}>
-                           <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
-                           <Pressable
-                             onPress={(e) => {
-                               e.stopPropagation();
-                               cycleLod(t.id);
-                             }}
-                             style={[s.lodBadge, { backgroundColor: lodBg }]}
-                           >
-                             <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
-                           </Pressable>
-                         </View>
- 
-                         <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
-                           {t.topic}
-                         </Text>
- 
-                         <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
-                            {prog}% • {t.questionsSolved}/{t.totalQuestions}
-                         </Text>
- 
-                         <View style={s.glassStrip}>
-                            <Pressable
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                bump(t.id, -1);
-                              }}
-                              style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
-                            >
-                              <Minus size={20} color={C.textMuted} />
-                            </Pressable>
-                            
-                            <Text style={s.stepVal}>{t.questionsSolved}</Text>
-                            
-                            <Pressable
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                bump(t.id, 1);
-                              }}
-                              style={({ pressed }) => [
-                                s.stepBtn, 
-                                s.stepBtnAdd,
-                                pressed && { opacity: 0.6 }
-                              ]}
-                            >
-                              <Plus size={20} color={C.white} />
-                            </Pressable>
-                         </View>
-                       </Pressable>
+                      >
+                        <View style={s.topicHead}>
+                          <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              cycleLod(t.id);
+                            }}
+                            style={[s.lodBadge, { backgroundColor: lodBg }]}
+                          >
+                            <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
+                          </Pressable>
+                        </View>
+
+                        <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
+                          {t.topic}
+                        </Text>
+
+                        <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
+                          {prog}% • {t.questionsSolved}/{t.totalQuestions}
+                        </Text>
+
+                        <View style={s.glassStrip}>
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              bump(t.id, -1);
+                            }}
+                            style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
+                          >
+                            <Minus size={20} color={C.textMuted} />
+                          </Pressable>
+
+                          <Text style={s.stepVal}>{t.questionsSolved}</Text>
+
+                          <Pressable
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              bump(t.id, 1);
+                            }}
+                            style={({ pressed }) => [
+                              s.stepBtn,
+                              s.stepBtnAdd,
+                              pressed && { opacity: 0.6 }
+                            ]}
+                          >
+                            <Plus size={20} color={C.white} />
+                          </Pressable>
+                        </View>
+                      </Pressable>
                     </View>
                   );
                 })}
@@ -457,62 +440,62 @@ export default function PlannerScreen() {
           ))
         )}
 
-          {/* RECOVERY DASHBOARD (v1.2.7) */}
-          <View style={{ marginTop: 40, padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 120 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <Zap size={18} color={C.accentCyan} />
-              <Text style={{ color: C.white, fontSize: 16, fontWeight: '700' }}>R1 Sync Recovery</Text>
-            </View>
-            
-            <View style={{ gap: 8 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Sync Status:</Text>
-                <Text style={{ color: userEmail ? C.accentCyan : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' }}>
-                  {userEmail ? 'Authenticated' : 'Guest Mode'}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Identity Key:</Text>
-                <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontVariant: ['tabular-nums'] }}>{userId?.slice(0, 12)}...</Text>
-              </View>
-            </View>
-
-            {showRecoveryEntry ? (
-              <View style={{ marginTop: 16, gap: 10 }}>
-                <TextInput
-                  style={[s.searchInput, { backgroundColor: 'rgba(255,255,255,0.05)', height: 40, paddingHorizontal: 12 }]}
-                  placeholder="Paste Recovery ID..."
-                  placeholderTextColor={C.textMuted}
-                  value={manualRecoveryID}
-                  onChangeText={setManualRecoveryID}
-                />
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <Pressable 
-                    onPress={() => manualMerge(manualRecoveryID)}
-                    style={({ pressed }) => [s.syncBtn, { flex: 1, backgroundColor: C.accentCyan }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={{ color: '#000', fontSize: 13, fontWeight: '700' }}>Confirm Restore</Text>
-                  </Pressable>
-                  <Pressable 
-                    onPress={() => setShowRecoveryEntry(false)}
-                    style={({ pressed }) => [s.syncBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
-                  >
-                    <Text style={{ color: C.white }}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <Pressable 
-                onPress={() => setShowRecoveryEntry(true)}
-                style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
-              >
-                <RefreshCcw size={16} color={C.white} />
-                <Text style={{ color: C.white, fontSize: 13, fontWeight: '700' }}>RESTORE STUDY HISTORY</Text>
-              </Pressable>
-            )}
-
-            <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
+        {/* RECOVERY DASHBOARD (v1.2.7) */}
+        <View style={{ marginTop: 40, padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 120 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+            <Zap size={18} color={C.accentCyan} />
+            <Text style={{ color: C.white, fontSize: 16, fontWeight: '700' }}>R1 Sync Recovery</Text>
           </View>
+
+          <View style={{ gap: 8 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Sync Status:</Text>
+              <Text style={{ color: userEmail ? C.accentCyan : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' }}>
+                {userEmail ? 'Authenticated' : 'Guest Mode'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Identity Key:</Text>
+              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontVariant: ['tabular-nums'] }}>{userId?.slice(0, 12)}...</Text>
+            </View>
+          </View>
+
+          {showRecoveryEntry ? (
+            <View style={{ marginTop: 16, gap: 10 }}>
+              <TextInput
+                style={[s.searchInput, { backgroundColor: 'rgba(255,255,255,0.05)', height: 40, paddingHorizontal: 12 }]}
+                placeholder="Paste Recovery ID..."
+                placeholderTextColor={C.textMuted}
+                value={manualRecoveryID}
+                onChangeText={setManualRecoveryID}
+              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <Pressable
+                  onPress={() => manualMerge(manualRecoveryID)}
+                  style={({ pressed }) => [s.syncBtn, { flex: 1, backgroundColor: C.accentCyan }, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={{ color: '#000', fontSize: 13, fontWeight: '700' }}>Confirm Restore</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setShowRecoveryEntry(false)}
+                  style={({ pressed }) => [s.syncBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={{ color: C.white }}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setShowRecoveryEntry(true)}
+              style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
+            >
+              <RefreshCcw size={16} color={C.white} />
+              <Text style={{ color: C.white, fontSize: 13, fontWeight: '700' }}>RESTORE STUDY HISTORY</Text>
+            </Pressable>
+          )}
+
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
+        </View>
       </ScrollView>
     </View>
   );
@@ -530,7 +513,7 @@ const s = StyleSheet.create({
 
   scroll: { paddingTop: SPACING.xl, paddingBottom: SPACING.xxxl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  
+
   header: { marginBottom: SPACING.lg, paddingHorizontal: SPACING.xs },
   headerTop: { flexWrap: 'wrap', gap: 15 },
   searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: R.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 15, minWidth: 260, flexGrow: 1, maxWidth: 400 },
@@ -538,9 +521,9 @@ const s = StyleSheet.create({
   searchClear: { paddingVertical: 10, paddingLeft: 10 },
   searchInput: { height: 44, color: C.white, fontSize: 14, fontWeight: '600', flex: 1 },
   subtitle: { ...TYPOGRAPHY.body, fontSize: 13, marginTop: 4, opacity: 0.5 },
-  
+
   noResults: { alignItems: 'center', justifyContent: 'center', paddingVertical: 100, width: '100%' },
-  
+
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.xl },
   examPill: {
     paddingHorizontal: 16,
@@ -553,10 +536,10 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.15)',
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  examPillOn: { 
-    borderColor: C.accentCyan, 
+  examPillOn: {
+    borderColor: C.accentCyan,
     borderWidth: 2,
-    backgroundColor: 'rgba(6,182,212,0.1)' 
+    backgroundColor: 'rgba(6,182,212,0.1)'
   },
   examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   examPillTxtOn: { color: C.white },
@@ -581,7 +564,7 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   badgeTxt: { ...TYPOGRAPHY.meta, color: C.textSecondary, fontSize: 9, letterSpacing: 0.5 },
-  
+
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -593,15 +576,15 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.05)',
     gap: 12,
   },
-  statBox: { 
-    alignItems: 'center', 
+  statBox: {
+    alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
   },
-  statLbl: { 
-    ...TYPOGRAPHY.meta, 
-    marginBottom: 6, 
-    fontSize: 9, 
+  statLbl: {
+    ...TYPOGRAPHY.meta,
+    marginBottom: 6,
+    fontSize: 9,
     opacity: 0.6,
     textAlign: 'center',
   },
@@ -612,10 +595,10 @@ const s = StyleSheet.create({
     width: '100%',
   },
   statVal: { color: C.white, fontSize: 40, fontWeight: '900', textAlign: 'center' },
-  
+
   pacingWrap: { marginTop: SPACING.md, alignItems: 'center' },
   pacing: { ...TYPOGRAPHY.body, fontSize: 13, opacity: 0.7 },
-  
+
   barContainer: { marginTop: SPACING.lg },
   barBgHero: {
     height: 6,
@@ -653,11 +636,11 @@ const s = StyleSheet.create({
   lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
   topicName: { marginBottom: SPACING.md, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
-  
+
   topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
   progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
   solvedSplit: { color: C.textMuted, fontSize: 11, fontWeight: '600', opacity: 0.5 },
-  
+
   miniBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, marginBottom: SPACING.lg, overflow: 'hidden' },
   miniBarFill: { height: 3, borderRadius: 1.5 },
 
@@ -725,7 +708,7 @@ const s = StyleSheet.create({
     textAlign: 'center',
     fontVariant: ['tabular-nums'],
   },
-  
+
   retryBtn: {
     borderRadius: R.sm,
     overflow: 'hidden',
