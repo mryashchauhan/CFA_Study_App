@@ -58,7 +58,9 @@ export function GlobalCommandHeader() {
               {userEmail ? (
                 <>
                   <Check size={14} color={C.accentCyan} />
-                  <Text style={[s.btnTxt, s.profileTxt]} numberOfLines={1}>{userEmail}</Text>
+                  <Text style={[s.btnTxt, s.profileTxt]} numberOfLines={1}>
+                    SYNCED: {userEmail}
+                  </Text>
                 </>
               ) : (
                 <>
@@ -124,9 +126,10 @@ const s = StyleSheet.create({
     borderColor: '#4285F4',
   },
   btnProfile: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderColor: 'rgba(255,255,255,0.08)',
-    maxWidth: 160,
+    backgroundColor: 'rgba(6, 182, 212, 0.1)',
+    borderColor: 'rgba(6, 182, 212, 0.3)',
+    maxWidth: 200,
+    borderRadius: 20,
   },
   btnTxt: {
     fontSize: 10,
