@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform, View, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ClipboardList, Target, History } from 'lucide-react-native';
+import { ClipboardList, Target, Clock } from 'lucide-react-native';
 import { C } from '@/constants/theme';
 import { GlobalCommandHeader } from '@/components/GlobalHeader';
 
