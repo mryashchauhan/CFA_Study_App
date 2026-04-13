@@ -19,7 +19,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
 
       - name: 📦 Install Dependencies
         run: npm install
@@ -30,7 +30,7 @@ jobs:
       - name: 🧠 Configure Gradle Memory
         run: |
           mkdir -p ~/.gradle
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError" >> ~/.gradle/gradle.properties
+          echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError" >> ~/.gradle/gradle.properties
           echo "org.gradle.daemon=false" >> ~/.gradle/gradle.properties
           echo "org.gradle.parallel=false" >> ~/.gradle/gradle.properties
 
@@ -39,7 +39,7 @@ jobs:
           cd android
           chmod +x gradlew
           sed -i 's/signingConfig signingConfigs.release/signingConfig signingConfigs.debug/g' app/build.gradle
-          ./gradlew assembleRelease
+          ./gradlew assembleRelease --info --stacktrace
 
       - name: 📤 Upload Artifact
         uses: actions/upload-artifact@v4
