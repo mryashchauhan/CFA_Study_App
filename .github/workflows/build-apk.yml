@@ -1,4 +1,4 @@
-name: APK Factory v1.4.3
+name: APK Factory v1.5.0-Production
 on:
   workflow_dispatch:
 

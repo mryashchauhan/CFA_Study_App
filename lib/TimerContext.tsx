@@ -17,6 +17,19 @@ import { ensureAuth, supabase } from './supabaseClient';
 /* ────────────────────────────────────────────────────
    Types
    ──────────────────────────────────────────────────── */
+export interface TopicRecord {
+  id: string;
+  user_id: string;
+  exam: string;
+  section: string;
+  topic: string;
+  questionsSolved: number;
+  totalQuestions: number;
+  lod: 'Easy' | 'Medium' | 'Hard';
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TimerCtx {
   /* auth */
   userId: string | null;
@@ -56,7 +69,8 @@ export interface TimerCtx {
   manualMerge: (oldId: string) => Promise<void>;
   handleSync: () => Promise<void>;
   userEmail: string | null;
-  topics: any[];
+  topics: TopicRecord[];
+}
 }
 
 const Ctx = createContext<TimerCtx | null>(null);
@@ -79,7 +93,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [topics, setTopics] = useState<any[]>([]); // Centralized study topics
+  const [topics, setTopics] = useState<TopicRecord[]>([]); // Centralized study topics
   const topicsChannelRef = useRef<any>(null); // Track active topics channel
   const timerChannelRef = useRef<any>(null); // Track timer state channel
   const authLock = useRef(false);
