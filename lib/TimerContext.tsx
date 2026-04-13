@@ -124,42 +124,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     } catch (e) { }
 
     try {
-      setAuthReady(false);
-
-      // 1. Sync Override (Zero-Input Cross-Device Handshake)
-      let currentSync = sync;
-      let currentRT = rt;
-      if (Platform.OS === 'web' && (!currentSync || !currentRT)) {
-        try {
-          const params = new URLSearchParams(window.location.search);
-          currentSync = params.get('sync') || undefined;
-          currentRT = params.get('rt') || undefined;
-        } catch (e) { }
-      }
-
-      if (currentSync && mounted) {
-        if (currentRT) {
-          try {
-            const { data: { user } } = await supabase.auth.setSession({
-              access_token: '',
-              refresh_token: currentRT
-            });
-            if (user) {
-              setUserId(user.id);
-              setAuthReady(true);
-              try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) { }
-              return;
-            }
-          } catch (e) { }
-        }
-        await AsyncStorage.setItem('supabase.auth.token', JSON.stringify({ user: { id: currentSync } }));
-        setUserId(currentSync);
-        setAuthReady(true);
-        try { router.setParams({ sync: undefined, rt: undefined }); } catch (e) { }
-        return;
-      }
-
-      // 2. Standard Session Check
+      // 1. Standard Session Check (Security Lockdown: Manual sync override removed)
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user && mounted) {
         const newId = session.user.id;
@@ -369,8 +334,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         );
       } catch (err) {
         console.error('Timer sync error:', err);
+      } finally {
+        syncLock.current = false;
       }
-      setTimeout(() => { syncLock.current = false; }, 1200);
     },
     [userId],
   );
@@ -696,6 +662,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (res.url) {
+          // OAuth Race Guard
+          if (handledUrlRef.current === res.url) return;
+
           // Manual Parsing
           const tokenStr = res.url.includes('#') ? res.url.split('#')[1] : res.url.split('?')[1] || '';
           const params = new URLSearchParams(tokenStr);
@@ -714,6 +683,9 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           if (!sData.session || !sData.session.user?.id) {
             throw new Error("Session not established");
           }
+
+          // ONLY after success, mark as handled
+          handledUrlRef.current = res.url;
         }
       }
     } catch (e: any) {
@@ -724,6 +696,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    await AsyncStorage.removeItem('merge_from_id');
+    handledUrlRef.current = null;
     setUserId(null);
     setUserEmail(null);
     setAuthReady(false);
