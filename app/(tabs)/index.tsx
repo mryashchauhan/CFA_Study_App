@@ -86,6 +86,11 @@ export default function PlannerScreen() {
   const [activeChip, setActiveChip] = useState<ExamType>(exam);
   const [showRecoveryEntry, setShowRecoveryEntry] = useState(false);
   const [manualRecoveryID, setManualRecoveryID] = useState('');
+  const [focusStats, setFocusStats] = useState({
+    totalHours: 0,
+    velocity: 0,
+    topTopic: 'N/A'
+  });
 
   const isDesktop = width >= 1200;
   const isTablet = width >= 768 && width < 1200;
@@ -108,7 +113,30 @@ export default function PlannerScreen() {
     if (globalTopics && globalTopics.length > 0) {
       setTopics(globalTopics);
     }
-  }, [globalTopics, authReady]);
+
+    const fetchAnalytics = async () => {
+      const { data } = await supabase
+        .from('focus_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('created_at', new Date(Date.now() - 7 * 86400000).toISOString());
+
+      if (data && data.length > 0) {
+        const totalSec = data.reduce((acc, s) => acc + (s.duration_seconds || 0), 0);
+        const totalQs = data.reduce((acc, s) => acc + (s.questions_attempted || 0), 0);
+        const topicsMap: Record<string, number> = {};
+        data.forEach(s => topicsMap[s.topic] = (topicsMap[s.topic] || 0) + 1);
+        const top = Object.entries(topicsMap).sort((a,b) => b[1] - a[1])[0][0];
+
+        setFocusStats({
+          totalHours: Number((totalSec / 3600).toFixed(1)),
+          velocity: totalSec > 0 ? Number((totalQs / (totalSec / 60)).toFixed(2)) : 0,
+          topTopic: top
+        });
+      }
+    };
+    fetchAnalytics();
+  }, [globalTopics, authReady, userId]);
 
   const bump = useCallback(
     async (id: string, delta: number) => {
@@ -331,6 +359,25 @@ export default function PlannerScreen() {
             </View>
             <Text style={[s.pctTxt, { marginTop: 0 }]}>{pct}%</Text>
           </View>
+        </View>
+
+        {/* Focus Insights Expansion (v1.5.0) */}
+        <View style={s.insightsGrid}>
+           <View style={[s.insightCard, { flex: 1 }]}>
+              <Text style={s.insightLabel}>WEEKLY FOCUS</Text>
+              <Text style={s.insightVal}>{focusStats.totalHours}h</Text>
+              <View style={s.miniProgress}><View style={[s.miniFill, { width: '65%', backgroundColor: C.accentCyan }]} /></View>
+           </View>
+           <View style={[s.insightCard, { flex: 1 }]}>
+              <Text style={s.insightLabel}>VELOCITY (Q/m)</Text>
+              <Text style={s.insightVal}>{focusStats.velocity}</Text>
+              <View style={s.miniProgress}><View style={[s.miniFill, { width: '45%', backgroundColor: C.accentIndigo }]} /></View>
+           </View>
+        </View>
+
+        <View style={[s.insightCard, { marginBottom: SPACING.xl }]}>
+           <Text style={s.insightLabel}>TOP PERFORMING TOPIC (7D)</Text>
+           <Text style={[s.insightVal, { fontSize: 18, marginTop: 4 }]} numberOfLines={1}>{focusStats.topTopic}</Text>
         </View>
 
         {loading ? (
@@ -720,5 +767,40 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  insightsGrid: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  insightCard: {
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    borderRadius: R.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+  },
+  insightLabel: {
+    ...TYPOGRAPHY.meta,
+    fontSize: 9,
+    opacity: 0.5,
+    letterSpacing: 1,
+  },
+  insightVal: {
+    color: C.white,
+    fontSize: 24,
+    fontWeight: '900',
+    marginTop: 4,
+  },
+  miniProgress: {
+    height: 3,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 1.5,
+    marginTop: 12,
+    overflow: 'hidden',
+  },
+  miniFill: {
+    height: '100%',
+    borderRadius: 1.5,
   },
 });

@@ -2,7 +2,7 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Platform, View, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ClipboardList, Target } from 'lucide-react-native';
+import { ClipboardList, Target, History } from 'lucide-react-native';
 import { C } from '@/constants/theme';
 import { GlobalCommandHeader } from '@/components/GlobalHeader';
 
@@ -60,6 +60,13 @@ export default function TabLayout() {
           options={{
             title: 'Focus',
             tabBarIcon: ({ color }) => <Target size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="history"
+          options={{
+            title: 'History',
+            tabBarIcon: ({ color }) => <History size={22} color={color} />,
           }}
         />
       </Tabs>

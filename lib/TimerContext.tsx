@@ -528,7 +528,21 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           updated_at: new Date().toISOString(),
         }).eq('id', topicRow.id);
       }
-    } catch (e) { }
+
+      // 2. Log individual focus session
+      await supabase.from('focus_sessions').insert({
+        user_id: userId,
+        exam: stateRef.current.exam,
+        section: stateRef.current.section,
+        topic: stateRef.current.topic,
+        duration_seconds: sessionSeconds,
+        questions_attempted: attCount,
+        questions_correct: corCount,
+        notes: recallText,
+      });
+    } catch (e) {
+      console.error('Failed to log session:', e);
+    }
 
     setFinished(false);
     setRecall('');
@@ -586,12 +600,25 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       }
       timerMigrated = true;
 
-      // STEP 3: CLEANUP ONLY IF BOTH SUCCESS
+      // STEP 3: Focus Sessions
+      const { data: oldSessions, error: fsFetchErr } = await supabase.from('focus_sessions').select('*').eq('user_id', oldId);
+      if (fsFetchErr) throw fsFetchErr;
+
+      if (oldSessions && oldSessions.length > 0) {
+        // Migration of history doesn't need upsert conflict handling, just re-inserting under new ID
+        const logs = oldSessions.map(({ id, created_at, ...rest }) => ({
+          ...rest,
+          user_id: newId
+        }));
+        const { error: fsErr } = await supabase.from('focus_sessions').insert(logs);
+        if (fsErr) throw fsErr;
+      }
+
+      // STEP 4: CLEANUP ONLY IF ALL SUCCESS
       if (topicsMigrated && timerMigrated) {
-        const { error: d1 } = await supabase.from('topics').delete().eq('user_id', oldId);
-        if (d1) throw d1;
-        const { error: d2 } = await supabase.from('timer_state').delete().eq('user_id', oldId);
-        if (d2) throw d2;
+        await supabase.from('topics').delete().eq('user_id', oldId);
+        await supabase.from('timer_state').delete().eq('user_id', oldId);
+        await supabase.from('focus_sessions').delete().eq('user_id', oldId);
         await AsyncStorage.removeItem('merge_from_id');
         console.log('[TimerContext] Atomic migration complete');
       }

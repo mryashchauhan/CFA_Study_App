@@ -123,11 +123,11 @@ export default function FocusScreen() {
               </View>
 
               <View style={s.inputGroup}>
-                <Text style={s.inputLabel}>Session Summary</Text>
+                <Text style={s.inputLabel}>Reflections & Notes</Text>
                 <TextInput
                   value={recallText}
                   onChangeText={setRecallText}
-                  placeholder="Key concepts mastered in this session..."
+                  placeholder="What did you learn? Any distractions?"
                   placeholderTextColor={C.textMuted}
                   multiline
                   autoFocus
