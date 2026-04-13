@@ -64,8 +64,7 @@ const Ctx = createContext<TimerCtx | null>(null);
 export function useTimer(): TimerCtx {
   const c = useContext(Ctx);
   if (!c) {
-    console.warn("TimerContext missing");
-    return {} as TimerCtx;
+    throw new Error("useTimer must be used within a TimerProvider");
   }
   return c;
 }
@@ -84,6 +83,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const topicsChannelRef = useRef<any>(null); // Track active topics channel
   const timerChannelRef = useRef<any>(null); // Track timer state channel
   const authLock = useRef(false);
+  const handledUrlRef = useRef<string | null>(null); // Prevent double-handling results
   const { sync, rt } = useLocalSearchParams<{ sync?: string; rt?: string }>();
   const router = useRouter();
 
@@ -203,11 +203,35 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // DEEP LINK HANDLER (for Mobile Auth Redirects)
     const handleUrl = async (url: string) => {
       if (!url) return;
-      const { queryParams } = Linking.parse(url);
-      if (queryParams?.access_token || queryParams?.refresh_token) {
-        // Force refresh session from deep link
-        await supabase.auth.refreshSession();
+      // Rule: Prevent duplicates BUT only AFTER success later
+      if (handledUrlRef.current === url) return;
+
+      try {
+        // Manual Parsing (Bypass Linking.parse for fragment safety)
+        const tokenStr = url.includes('#') ? url.split('#')[1] : url.split('?')[1] || '';
+        const params = new URLSearchParams(tokenStr);
+        const code = params.get('code');
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+
+        if (code) {
+          await supabase.auth.exchangeCodeForSession(code);
+        } else if (access_token && refresh_token) {
+          await supabase.auth.setSession({ access_token, refresh_token });
+        }
+
+        // VERIFY SESSION (CRITICAL)
+        const { data } = await supabase.auth.getSession();
+        if (!data.session || !data.session.user?.id) {
+          throw new Error("Invalid session after OAuth");
+        }
+
+        // Mark handled ONLY after success
+        handledUrlRef.current = url;
         loadAll(mounted);
+
+      } catch (e) {
+        console.error("Deep link auth failed", e);
       }
     };
 
@@ -217,7 +241,14 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // GLOBAL AUTH HEARTBEAT: Reacts to logins/logouts in real-time
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+
+      const currentUserId = session?.user?.id;
+      if (
+        (event === 'SIGNED_IN' ||
+         event === 'TOKEN_REFRESHED' ||
+         event === 'USER_UPDATED') &&
+        currentUserId !== userId
+      ) {
         loadAll(mounted);
       } else if (event === 'SIGNED_OUT') {
         setUserEmail(null);
@@ -280,7 +311,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        channelRef.current = ch;
+        topicsChannelRef.current = ch;
       } catch (err) {
         console.warn('v1.4.0 Sync Error:', err);
       }
@@ -545,34 +576,68 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const mergeIdentity = async (oldId: string, newId: string) => {
     if (oldId === newId) return;
+    
+    let topicsMigrated = false;
+    let timerMigrated = false;
+
     try {
-      // 1. Move topics progress
-      const { data: oldTopics } = await supabase.from('topics').select('*').eq('user_id', oldId);
+      console.log(`[TimerContext] MERGING: ${oldId} -> ${newId}`);
+
+      // STEP 1: Topics
+      const { data: oldTopics, error: tFetchErr } = await supabase.from('topics').select('*').eq('user_id', oldId);
+      if (tFetchErr) throw tFetchErr;
+
       if (oldTopics && oldTopics.length > 0) {
         for (const t of oldTopics) {
           const { id, created_at, updated_at, ...rest } = t;
-          await supabase.from('topics').upsert({
-            ...rest,
-            user_id: newId,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'user_id,exam,section,topic' });
-        }
-        // Cleanup old anonymous rows
-        await supabase.from('topics').delete().eq('user_id', oldId);
-      }
 
-      // 2. Move timer state
-      const { data: oldTimer } = await supabase.from('timer_state').select('*').eq('user_id', oldId).maybeSingle();
+          const { error: tErr } = await supabase
+            .from('topics')
+            .upsert(
+              { ...rest, user_id: newId, updated_at: new Date().toISOString() },
+              { onConflict: 'user_id,exam,section,topic' }
+            );
+
+          if (tErr) throw tErr;
+        }
+      }
+      topicsMigrated = true;
+
+      // STEP 2: Timer
+      const { data: oldTimer, error: tmFetchErr } = await supabase.from('timer_state').select('*').eq('user_id', oldId).maybeSingle();
+      if (tmFetchErr) throw tmFetchErr;
+
       if (oldTimer) {
         const { id, created_at, updated_at, ...rest } = oldTimer;
-        await supabase.from('timer_state').upsert({
-          ...rest,
-          user_id: newId,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'user_id' });
-        await supabase.from('timer_state').delete().eq('user_id', oldId);
+
+        const { error: tmErr } = await supabase
+          .from('timer_state')
+          .upsert(
+            { ...rest, user_id: newId, updated_at: new Date().toISOString() },
+            { onConflict: 'user_id' }
+          );
+
+        if (tmErr) throw tmErr;
       }
-    } catch (e) { }
+      timerMigrated = true;
+
+      // STEP 3: CLEANUP ONLY IF BOTH SUCCESS
+      if (topicsMigrated && timerMigrated) {
+        const { error: d1 } = await supabase.from('topics').delete().eq('user_id', oldId);
+        if (d1) throw d1;
+        const { error: d2 } = await supabase.from('timer_state').delete().eq('user_id', oldId);
+        if (d2) throw d2;
+        await AsyncStorage.removeItem('merge_from_id');
+        console.log('[TimerContext] Atomic migration complete');
+      }
+
+    } catch (error) {
+      console.error('Migration halted', { topicsMigrated, timerMigrated, error });
+      Alert.alert(
+        'Sync Postponed',
+        'Connection lost. Your progress remains safe on this device.'
+      );
+    }
   };
 
   const handleSync = async () => {
@@ -608,39 +673,53 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         // Cache the current ID as a source for the upcoming identity merge
         await AsyncStorage.setItem('merge_from_id', userId);
       }
-    } catch (e) { }
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: Platform.OS === 'web'
-          ? window.location.origin
-          : 'cfastudyapp://google-auth', // Points to our new dedicated landing pad
-        skipBrowserRedirect: true,
-      },
-    });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'cfastudyapp://google-auth',
+          skipBrowserRedirect: true,
+        },
+      });
 
-    if (error) {
-      Alert.alert('Login Error', error.message);
-      return;
-    }
+      if (error) {
+        Alert.alert('Login Error', 'Network or authentication failure.');
+        return;
+      }
 
-    if (data?.url) {
-      // Launch native auth session
-      const res = await WebBrowser.openAuthSessionAsync(data.url, 'cfastudyapp://google-auth');
-      if (res.type === 'success' && res.url) {
-        // Capture hash and session
-        const { queryParams } = Linking.parse(res.url);
-        if (queryParams?.access_token) {
-          await supabase.auth.setSession({
-            access_token: queryParams.access_token as string,
-            refresh_token: queryParams.refresh_token as string,
-          });
+      if (data?.url) {
+        // Launch native auth session
+        const res = await WebBrowser.openAuthSessionAsync(data.url, 'cfastudyapp://google-auth');
+        if (res.type !== 'success') {
+          Alert.alert('Login Cancelled', 'Please try again.');
+          return;
+        }
+
+        if (res.url) {
+          // Manual Parsing
+          const tokenStr = res.url.includes('#') ? res.url.split('#')[1] : res.url.split('?')[1] || '';
+          const params = new URLSearchParams(tokenStr);
+          const code = params.get('code');
+          const access_token = params.get('access_token');
+          const refresh_token = params.get('refresh_token');
+
+          if (code) {
+            await supabase.auth.exchangeCodeForSession(code);
+          } else if (access_token && refresh_token) {
+            await supabase.auth.setSession({ access_token, refresh_token });
+          }
+
+          // VERIFY SESSION
+          const { data: sData } = await supabase.auth.getSession();
+          if (!sData.session || !sData.session.user?.id) {
+            throw new Error("Session not established");
+          }
         }
       }
+    } catch (e: any) {
+      console.error('Google Sign-In Exception:', e);
+      Alert.alert('Login Error', 'Network or authentication failure.');
     }
-    // Note: We no longer call loadAll(true) here because the onAuthStateChange listener
-    // in this same context will trigger the reload as soon as the session is captured.
   };
 
   const signOut = async () => {
