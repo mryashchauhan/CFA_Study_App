@@ -280,7 +280,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           )
           .subscribe();
 
-        topicsChannelRef.current = ch;
+        channelRef.current = ch;
       } catch (err) {
         console.warn('v1.4.0 Sync Error:', err);
       }
@@ -546,7 +546,6 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const mergeIdentity = async (oldId: string, newId: string) => {
     if (oldId === newId) return;
     try {
-      console.log(`[TimerContext] MERGING IDENTITY: ${oldId.slice(0, 8)} -> ${newId.slice(0, 8)}`);
       // 1. Move topics progress
       const { data: oldTopics } = await supabase.from('topics').select('*').eq('user_id', oldId);
       if (oldTopics && oldTopics.length > 0) {

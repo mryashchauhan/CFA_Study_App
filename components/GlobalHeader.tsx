@@ -1,9 +1,9 @@
-import React from 'react';
-import { View, Text, Pressable, StyleSheet, useWindowDimensions, Platform } from 'react-native';
-import { RefreshCcw, Check, Zap } from 'lucide-react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R, SPACING, TYPOGRAPHY } from '@/constants/theme';
+import { C, R } from '@/constants/theme';
 import { useTimer } from '@/lib/TimerContext';
+import { Check, RefreshCcw, Zap } from 'lucide-react-native';
+import React from 'react';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
  * GlobalCommandHeader
@@ -38,7 +38,7 @@ export function GlobalCommandHeader() {
           {/* Controls */}
           <View style={s.controls}>
             {/* 1. Magic Link */}
-            <Pressable 
+            <Pressable
               onPress={handleSync}
               style={({ pressed }) => [s.btn, s.btnMagic, pressed && { opacity: 0.7 }]}
             >
@@ -47,20 +47,18 @@ export function GlobalCommandHeader() {
             </Pressable>
 
             {/* 2. Google Login / Badge */}
-            <Pressable 
+            <Pressable
               onPress={handleAuthPress}
               style={({ pressed }) => [
-                s.btn, 
-                userEmail ? s.btnProfile : s.btnGoogle, 
+                s.btn,
+                userEmail ? s.btnProfile : s.btnGoogle,
                 pressed && { opacity: 0.7 }
               ]}
             >
               {userEmail ? (
                 <>
                   <Check size={14} color={C.accentCyan} />
-                  <Text style={[s.btnTxt, s.profileTxt]} numberOfLines={1}>
-                    SYNCED: {userEmail}
-                  </Text>
+                  <Text style={[s.btnTxt, s.profileTxt]} numberOfLines={1}>{userEmail}</Text>
                 </>
               ) : (
                 <>
@@ -126,10 +124,9 @@ const s = StyleSheet.create({
     borderColor: '#4285F4',
   },
   btnProfile: {
-    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-    borderColor: 'rgba(6, 182, 212, 0.3)',
-    maxWidth: 200,
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,255,255,0.08)',
+    maxWidth: 160,
   },
   btnTxt: {
     fontSize: 10,

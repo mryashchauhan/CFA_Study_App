@@ -448,20 +448,13 @@ export default function PlannerScreen() {
           </View>
 
           <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Sync Status:</Text>
-              <View style={[
-                { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, borderWidth: 1 },
-                userEmail 
-                  ? { backgroundColor: 'rgba(6,182,212,0.15)', borderColor: 'rgba(6,182,212,0.4)' } 
-                  : { backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.1)' }
-              ]}>
-                <Text style={{ color: userEmail ? C.accentCyan : 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  {userEmail ? 'Authenticated' : 'Guest Mode'}
-                </Text>
-              </View>
+              <Text style={{ color: userEmail ? C.accentCyan : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' }}>
+                {userEmail ? 'Authenticated' : 'Guest Mode'}
+              </Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Identity Key:</Text>
               <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontVariant: ['tabular-nums'] }}>{userId?.slice(0, 12)}...</Text>
             </View>
@@ -501,7 +494,7 @@ export default function PlannerScreen() {
             </Pressable>
           )}
 
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.9 • Ironclad Sync Stabilization</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
         </View>
       </ScrollView>
     </View>
