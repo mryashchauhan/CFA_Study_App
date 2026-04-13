@@ -157,7 +157,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         setAuthReady(true);
       }
     } finally {
-      setTimeout(() => { authLock.current = false; }, 500);
+      authLock.current = false;
     }
   }, [sync, rt, router]);
 
@@ -168,8 +168,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     // DEEP LINK HANDLER (for Mobile Auth Redirects)
     const handleUrl = async (url: string) => {
       if (!url) return;
-      // Rule: Prevent duplicates BUT only AFTER success later
       if (handledUrlRef.current === url) return;
+      handledUrlRef.current = url; // LOCK IMMEDIATELY before any async work
 
       try {
         // Manual Parsing (Bypass Linking.parse for fragment safety)
@@ -191,9 +191,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           throw new Error("Invalid session after OAuth");
         }
 
-        // Mark handled ONLY after success
-        handledUrlRef.current = url;
-        loadAll(mounted);
+        // Handled via immediate lock at top
+        // No manual loadAll needed (managed by onAuthStateChange)
 
       } catch (e) {
         console.error("Deep link auth failed", e);
@@ -636,61 +635,38 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       if (userId) {
-        // Cache the current ID as a source for the upcoming identity merge
+        // Cache the current anonymous ID as the source for the upcoming identity merge
         await AsyncStorage.setItem('merge_from_id', userId);
       }
 
+      // 1. Request the secure OAuth URL from Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           redirectTo: 'cfastudyapp://google-auth',
-          skipBrowserRedirect: true,
+          skipBrowserRedirect: true, // Crucial: Prevents Supabase from attempting a web redirect
         },
       });
 
       if (error) {
-        Alert.alert('Login Error', 'Network or authentication failure.');
+        Alert.alert('Login Error', error.message);
         return;
       }
 
+      // 2. Launch the native browser overlay for the user to authenticate
       if (data?.url) {
-        // Launch native auth session
+        // The browser will return control to the app via the 'cfastudyapp://google-auth' scheme.
+        // The global Linking.addEventListener ('handleUrl') will intercept and process the token.
         const res = await WebBrowser.openAuthSessionAsync(data.url, 'cfastudyapp://google-auth');
+        
         if (res.type !== 'success') {
-          Alert.alert('Login Cancelled', 'Please try again.');
-          return;
-        }
-
-        if (res.url) {
-          // OAuth Race Guard
-          if (handledUrlRef.current === res.url) return;
-
-          // Manual Parsing
-          const tokenStr = res.url.includes('#') ? res.url.split('#')[1] : res.url.split('?')[1] || '';
-          const params = new URLSearchParams(tokenStr);
-          const code = params.get('code');
-          const access_token = params.get('access_token');
-          const refresh_token = params.get('refresh_token');
-
-          if (code) {
-            await supabase.auth.exchangeCodeForSession(code);
-          } else if (access_token && refresh_token) {
-            await supabase.auth.setSession({ access_token, refresh_token });
-          }
-
-          // VERIFY SESSION
-          const { data: sData } = await supabase.auth.getSession();
-          if (!sData.session || !sData.session.user?.id) {
-            throw new Error("Session not established");
-          }
-
-          // ONLY after success, mark as handled
-          handledUrlRef.current = res.url;
+          // Handle user cancellation gracefully
+          console.log('Auth session was cancelled or failed.');
         }
       }
-    } catch (e: any) {
+    } catch (e) {
       console.error('Google Sign-In Exception:', e);
-      Alert.alert('Login Error', 'Network or authentication failure.');
+      Alert.alert('Login Error', 'An unexpected error occurred during authentication.');
     }
   };
 

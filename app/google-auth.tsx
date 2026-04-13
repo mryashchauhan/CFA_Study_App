@@ -3,29 +3,32 @@ import { supabase } from '@/lib/supabaseClient';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 
 export default function GoogleAuthLanding() {
   const router = useRouter();
   const initialUrl = Linking.useURL(); 
   const [debugLog, setDebugLog] = useState('Waiting for secure redirect...');
+  const handledRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!initialUrl) return;
+    if (handledRef.current === initialUrl) return;
+    handledRef.current = initialUrl; // LOCK IMMEDIATELY before any async work
 
     const processAuth = async () => {
       try {
         setDebugLog('URL intercepted. Parsing tokens...');
 
-        const fragmentStr = initialUrl.split('#')[1] ?? '';
-        const fragment = Object.fromEntries(new URLSearchParams(fragmentStr));
+        // Manual Parsing (Bypass Linking.parse for PKCE/fragment safety)
+        const tokenStr = initialUrl.includes('#') ? initialUrl.split('#')[1] : initialUrl.split('?')[1] || '';
+        const params = new URLSearchParams(tokenStr);
+        const code = params.get('code');
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
 
-        const parsed = Linking.parse(initialUrl);
-        const code = parsed.queryParams?.code as string;
-        const access_token = (parsed.queryParams?.access_token ?? fragment.access_token) as string;
-        const refresh_token = (parsed.queryParams?.refresh_token ?? fragment.refresh_token) as string;
-
+        // 1. Handshake
         if (code) {
           setDebugLog('Authenticating with secure code...');
           await supabase.auth.exchangeCodeForSession(code);
@@ -36,9 +39,16 @@ export default function GoogleAuthLanding() {
           setDebugLog('No tokens found. Bypassing to Guest Mode.');
         }
 
+        // 2. VERIFY (The Absolute Requirement)
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data.session?.user?.id) {
+          throw new Error("Session initialization failed at the gate");
+        }
+
+        console.log('✅ Handshake Verified. User ID:', data.session.user.id);
         router.replace('/(tabs)');
       } catch (e: any) {
-        setDebugLog(`Auth Error: ${e.message}`);
+        setDebugLog(`❌ Auth Error: ${e.message}`);
         setTimeout(() => router.replace('/(tabs)'), 2000);
       }
     };
