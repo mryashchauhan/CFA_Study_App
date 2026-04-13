@@ -63,10 +63,10 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="history"
+          name="log"
           options={{
             title: 'History',
-            tabBarIcon: ({ color }) => <History size={22} color={color} />,
+            tabBarIcon: ({ color }) => <Clock size={22} color={color} />,
           }}
         />
       </Tabs>

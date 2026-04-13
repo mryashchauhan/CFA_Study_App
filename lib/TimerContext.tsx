@@ -71,7 +71,6 @@ export interface TimerCtx {
   userEmail: string | null;
   topics: TopicRecord[];
 }
-}
 
 const Ctx = createContext<TimerCtx | null>(null);
 
