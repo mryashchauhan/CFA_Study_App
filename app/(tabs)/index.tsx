@@ -158,6 +158,27 @@ export default function PlannerScreen() {
     [topics],
   );
 
+  const handleSignOut = async () => {
+    const performSignOut = async () => {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error.message);
+        return;
+      }
+      router.replace('/');
+    };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to sign out?')) {
+        await performSignOut();
+      }
+    } else {
+      Alert.alert('Sign Out', 'Are you sure you want to sign out and clear your session?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign Out', style: 'destructive', onPress: performSignOut },
+      ]);
+    }
+  };
+
   const totalQ = topics.reduce((s, t) => s + t.totalQuestions, 0);
   const solved = topics.reduce((s, t) => s + t.questionsSolved, 0);
   const remain = totalQ - solved;
@@ -521,6 +542,17 @@ export default function PlannerScreen() {
               <Text style={{ color: C.white, fontSize: 13, fontWeight: '700' }}>RESTORE STUDY HISTORY</Text>
             </Pressable>
           )}
+
+          <Pressable
+            onPress={handleSignOut}
+            style={({ pressed }) => [
+              s.syncBtn,
+              { marginTop: 16, backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.2)', justifyContent: 'center' },
+              pressed && { opacity: 0.7 }
+            ]}
+          >
+            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 }}>SIGN OUT</Text>
+          </Pressable>
 
           <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
         </View>
