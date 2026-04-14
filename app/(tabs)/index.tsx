@@ -49,28 +49,6 @@ interface Topic {
   lod: 'Easy' | 'Medium' | 'Hard';
 }
 
-async function seedTopics(uid: string, exam: ExamType) {
-  try {
-    const sections = SYLLABUS[exam];
-    if (!sections) return;
-    const rows = Object.entries(sections).flatMap(([section, sectionData]) =>
-      sectionData.topics.map(topic => ({
-        user_id: uid,
-        exam,
-        section,
-        topic,
-        questionsSolved: 0,
-        totalQuestions: 50,
-        lod: 'Medium' as const,
-      })),
-    );
-    await supabase.from('topics').upsert(rows, {
-      onConflict: 'user_id,exam,section,topic',
-    });
-  } catch (error) {
-    console.warn('Supabase sync failed (seed):', error);
-  }
-}
 
 export default function PlannerScreen() {
   const {
@@ -110,8 +88,8 @@ export default function PlannerScreen() {
 
     setLoading(false);
 
-    if (globalTopics && globalTopics.length > 0) {
-      setTopics(globalTopics);
+    if (globalTopics) {
+      setTopics(globalTopics || []);
     }
 
     const fetchAnalytics = async () => {
@@ -282,7 +260,10 @@ export default function PlannerScreen() {
             return (
               <Pressable
                 key={e}
-                onPress={() => setSelectedExam(e)}
+                onPress={() => {
+                  setSelectedExam(e);
+                  setExam(e);
+                }}
                 style={({ pressed }) => [
                   s.examPill,
                   on ? s.examPillOn : s.examPillOff,

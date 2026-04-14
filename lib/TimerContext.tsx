@@ -82,6 +82,33 @@ export function useTimer(): TimerCtx {
   return c;
 }
 
+/* ────────────────────────────────────────────────────
+   Syllabus Seeding (Automated v1.5.0)
+   ──────────────────────────────────────────────────── */
+async function seedTopics(uid: string, examKey: ExamType) {
+  try {
+    const sections = SYLLABUS[examKey];
+    if (!sections) return;
+    const rows = Object.entries(sections).flatMap(([section, sectionData]) =>
+      sectionData.topics.map(topic => ({
+        user_id: uid,
+        exam: examKey,
+        section,
+        topic,
+        questionsSolved: 0,
+        totalQuestions: 50,
+        lod: 'Medium' as const,
+      })),
+    );
+    await supabase.from('topics').upsert(rows, {
+      onConflict: 'user_id,exam,section,topic',
+    });
+  } catch (error) {
+    console.warn('Supabase sync failed (seed):', error);
+  }
+}
+
+
 WebBrowser.maybeCompleteAuthSession();
 
 /* ────────────────────────────────────────────────────
@@ -241,21 +268,15 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     };
   }, [loadAll]);
 
-  // NEW: Centralized Topics Sync Effect (Ironclad v1.4.0)
+  // UPDATED: Centralized Topics Sync Effect with Auto-Seeding (v1.5.0)
   useEffect(() => {
     if (!userId || !authReady) return;
     let alive = true;
 
     const setupTopicsSync = async () => {
       try {
-        // 1. Definitively clean up old subscriptions
-        if (topicsChannelRef.current) {
-          await supabase.removeChannel(topicsChannelRef.current);
-          topicsChannelRef.current = null;
-        }
-
-        // 2. Initial Fetch
-        const { data } = await supabase
+        // 1. Initial Fetch filtered by active exam
+        let { data, error } = await supabase
           .from('topics')
           .select('*')
           .eq('user_id', userId)
@@ -263,34 +284,61 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           .order('section')
           .order('topic');
 
+        if (error) {
+          console.warn('Supabase sync failed (fetch):', error);
+          return;
+        }
+
+        // 2. AUTO-SEED if this exam has no rows yet
+        if (alive && data && data.length === 0) {
+          await seedTopics(userId, exam);
+
+          // Refetch immediately
+          const { data: refetched, error: refetchErr } = await supabase
+            .from('topics')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('exam', exam)
+            .order('section')
+            .order('topic');
+
+          if (refetchErr) {
+            console.warn('Supabase sync failed (refetch):', refetchErr);
+            return;
+          }
+          data = refetched;
+        }
+
         if (alive && data) setTopics(data);
 
         // 3. Establish Single Stable Realtime Listener
-        const ch = supabase
+        const channel = supabase
           .channel(`topics-global-${exam}`)
           .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'topics', filter: `user_id=eq.${userId}` },
             payload => {
               if (!alive) return;
-              if (payload.eventType === 'UPDATE') {
-                const u = payload.new as any;
-                setTopics(prev => prev.map(t => (t.id === u.id ? { ...t, ...u } : t)));
-              } else if (payload.eventType === 'INSERT') {
-                setTopics(prev => {
-                  if (prev.find(t => t.id === payload.new.id)) return prev;
-                  return [...prev, payload.new];
-                });
-              } else if (payload.eventType === 'DELETE') {
-                setTopics(prev => prev.filter(t => t.id !== payload.old.id));
-              }
+              const n = payload.new as any;
+              const o = payload.old as any;
+              setTopics(prev => {
+                if (payload.eventType === 'UPDATE' && n) {
+                  return prev.map(t => (t.id === n.id ? { ...t, ...n } : t));
+                } else if (payload.eventType === 'INSERT' && n) {
+                  if (prev.find(t => t.id === n.id)) return prev;
+                  return [...prev, n];
+                } else if (payload.eventType === 'DELETE' && o) {
+                  return prev.filter(t => t.id !== o.id);
+                }
+                return prev;
+              });
             }
           )
           .subscribe();
 
-        topicsChannelRef.current = ch;
+        topicsChannelRef.current = channel;
       } catch (err) {
-        console.warn('v1.4.0 Sync Error:', err);
+        console.warn('v1.5.0 Sync Error:', err);
       }
     };
 
@@ -679,11 +727,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem('merge_from_id', userId);
       }
 
+      // Platform-aware redirect for OAuth
+      const redirectTo = Platform.OS === 'web'
+        ? 'https://cfa-study-app-self.vercel.app/google-auth'
+        : Linking.createURL('/google-auth');
+
       // 1. Request the secure OAuth URL from Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: 'cfastudyapp://google-auth',
+          redirectTo,
           skipBrowserRedirect: true, // Crucial: Prevents Supabase from attempting a web redirect
         },
       });
@@ -695,12 +748,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       // 2. Launch the native browser overlay for the user to authenticate
       if (data?.url) {
-        // The browser will return control to the app via the 'cfastudyapp://google-auth' scheme.
-        // The global Linking.addEventListener ('handleUrl') will intercept and process the token.
-        const res = await WebBrowser.openAuthSessionAsync(data.url, 'cfastudyapp://google-auth');
+        // On Web, we simply redirect to the OAuth URL
+        if (Platform.OS === 'web') {
+          window.location.href = data.url;
+          return;
+        }
+
+        // On Native, we use the browser overlay
+        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         
         if (res.type !== 'success') {
-          // Handle user cancellation gracefully
           console.log('Auth session was cancelled or failed.');
         }
       }
