@@ -52,7 +52,7 @@ interface Topic {
 
 export default function PlannerScreen() {
   const {
-    userId, authReady, exam, setExam, topics: globalTopics, userEmail
+    userId, authReady, exam, setExam, topics: globalTopics, userEmail, resetSyllabus
   } = useTimer();
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -543,6 +543,23 @@ export default function PlannerScreen() {
             </Pressable>
           )}
 
+            <Pressable
+              onPress={() => {
+                Alert.alert(
+                  'Repair Syllabus',
+                  `This will reset your ${exam} study progress to fix alignment issues. This cannot be undone.`,
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Reset & Repair', style: 'destructive', onPress: resetSyllabus }
+                  ]
+                );
+              }}
+              style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,165,0,0.08)' }, pressed && { opacity: 0.7 }]}
+            >
+              <Zap size={16} color={C.warning} />
+              <Text style={{ color: C.warning, fontSize: 13, fontWeight: '700' }}>REPAIR SYLLABUS CONTENT</Text>
+            </Pressable>
+
           <Pressable
             onPress={handleSignOut}
             style={({ pressed }) => [
@@ -554,7 +571,7 @@ export default function PlannerScreen() {
             <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 }}>SIGN OUT</Text>
           </Pressable>
 
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.5.1 • Gold Master Release</Text>
         </View>
       </ScrollView>
     </View>
@@ -747,6 +764,7 @@ const s = StyleSheet.create({
     gap: 12,
   },
   stepBtn: {
+    userSelect: 'none',
     width: 48,
     height: 48,
     borderRadius: 6,

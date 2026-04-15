@@ -68,6 +68,7 @@ export interface TimerCtx {
   forceMerge: () => Promise<void>;
   manualMerge: (oldId: string) => Promise<void>;
   handleSync: () => Promise<void>;
+  resetSyllabus: () => Promise<void>;
   userEmail: string | null;
   topics: TopicRecord[];
 }
@@ -798,7 +799,34 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       loadAll(true);
       Alert.alert('Manual Sync Success', `Study history from device ${oldId.slice(0, 8)} has been merged.`);
     } catch (e) {
-      Alert.alert('Manual Sync Error', 'Could not find data for that ID.');
+      Alert.alert('Sync Refused', 'Identity key invalid or connection timed out.');
+    }
+  };
+
+  const resetSyllabus = async () => {
+    if (!userId) return;
+    try {
+      console.log(`[TimerContext] RESETTING SYLLABUS: ${exam} for user ${userId}`);
+      
+      // 1. Wipe existing topics for this exam
+      const { error: delErr } = await supabase
+        .from('topics')
+        .delete()
+        .eq('user_id', userId)
+        .eq('exam', exam);
+
+      if (delErr) throw delErr;
+
+      // 2. Re-seed correct topics
+      await seedTopics(userId, exam);
+      
+      // 3. The existing setupTopicsSync effect will refetch automatically
+      // since it's listening to the same 'exam' state.
+      
+      Alert.alert('Syllabus Repaired', `The ${exam} syllabus has been reset to its default state.`);
+    } catch (err) {
+      console.error('Reset failed', err);
+      Alert.alert('Repair Failed', 'Could not reach server to reset syllabus.');
     }
   };
 

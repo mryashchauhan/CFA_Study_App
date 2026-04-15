@@ -11,6 +11,7 @@
       }
     },
     "preview": {
+      "developmentClient": false,
       "android": {
         "buildType": "apk"
       },
