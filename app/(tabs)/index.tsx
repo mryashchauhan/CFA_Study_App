@@ -60,8 +60,6 @@ export default function PlannerScreen() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedExam, setSelectedExam] = useState<ExamType>(exam);
-  const [activeChip, setActiveChip] = useState<ExamType>(exam);
   const [showRecoveryEntry, setShowRecoveryEntry] = useState(false);
   const [manualRecoveryID, setManualRecoveryID] = useState('');
   const [focusStats, setFocusStats] = useState({
@@ -179,19 +177,22 @@ export default function PlannerScreen() {
     }
   };
 
-  const totalQ = topics.reduce((s, t) => s + t.totalQuestions, 0);
-  const solved = topics.reduce((s, t) => s + t.questionsSolved, 0);
+  const processed = (globalTopics || []).filter(t =>
+    t.exam === exam && (
+      t.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.section.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  );
+
+  const totalQ = processed.reduce((s, t) => s + t.totalQuestions, 0);
+  const solved = processed.reduce((s, t) => s + t.questionsSolved, 0);
   const remain = totalQ - solved;
-  const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
+  const examDate = new Date(EXAM_DATES[exam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
   const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
   const pct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
-  const processed = topics.filter(t =>
-    t.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.section.toLowerCase().includes(searchQuery.toLowerCase())
-  );
 
   processed.forEach(t => {
     (grouped[t.section] ??= []).push(t);
@@ -277,12 +278,11 @@ export default function PlannerScreen() {
 
         <View style={s.pills}>
           {EXAM_LIST.map(e => {
-            const on = e === selectedExam;
+            const on = e === exam;
             return (
               <Pressable
                 key={e}
                 onPress={() => {
-                  setSelectedExam(e);
                   setExam(e);
                 }}
                 style={({ pressed }) => [
@@ -311,7 +311,7 @@ export default function PlannerScreen() {
           <View style={s.heroHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Zap size={20} color={C.accentCyan} />
-              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
+              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{exam} Analytics</Text>
             </View>
             <View style={s.heroBadge}>
               <Text style={s.badgeTxt}>
@@ -421,7 +421,7 @@ export default function PlannerScreen() {
                     <View key={t.id} style={{ width: cardW }}>
                       <Pressable
                         onPress={() => {
-                          setExam(selectedExam);
+                          setExam(exam);
                           setSection(t.section);
                           setTopic(t.topic);
                           router.push('/focus');
