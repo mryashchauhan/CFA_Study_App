@@ -8,8 +8,7 @@ import {
   R,
   SHADOWS,
   SPACING,
-  SYLLABUS,
-  TYPOGRAPHY,
+  TYPOGRAPHY
 } from '@/constants/theme';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
@@ -60,7 +59,6 @@ export default function PlannerScreen() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedExam, setSelectedExam] = useState<ExamType>(exam);
   const [activeChip, setActiveChip] = useState<ExamType>(exam);
   const [showRecoveryEntry, setShowRecoveryEntry] = useState(false);
   const [manualRecoveryID, setManualRecoveryID] = useState('');
@@ -104,7 +102,7 @@ export default function PlannerScreen() {
         const totalQs = data.reduce((acc, s) => acc + (s.questions_attempted || 0), 0);
         const topicsMap: Record<string, number> = {};
         data.forEach(s => topicsMap[s.topic] = (topicsMap[s.topic] || 0) + 1);
-        const top = Object.entries(topicsMap).sort((a,b) => b[1] - a[1])[0][0];
+        const top = Object.entries(topicsMap).sort((a, b) => b[1] - a[1])[0][0];
 
         setFocusStats({
           totalHours: Number((totalSec / 3600).toFixed(1)),
@@ -182,16 +180,18 @@ export default function PlannerScreen() {
   const totalQ = topics.reduce((s, t) => s + t.totalQuestions, 0);
   const solved = topics.reduce((s, t) => s + t.questionsSolved, 0);
   const remain = totalQ - solved;
-  const examDate = new Date(EXAM_DATES[selectedExam] ?? Date.now());
+  const examDate = new Date(EXAM_DATES[exam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
   const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
   const pct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
-  const processed = topics.filter(t =>
-    t.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    t.section.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const processed = topics
+    .filter(t => t.exam === exam)
+    .filter(t =>
+      t.topic.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      t.section.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   processed.forEach(t => {
     (grouped[t.section] ??= []).push(t);
@@ -277,12 +277,11 @@ export default function PlannerScreen() {
 
         <View style={s.pills}>
           {EXAM_LIST.map(e => {
-            const on = e === selectedExam;
+            const on = e === exam;
             return (
               <Pressable
                 key={e}
                 onPress={() => {
-                  setSelectedExam(e);
                   setExam(e);
                 }}
                 style={({ pressed }) => [
@@ -311,7 +310,7 @@ export default function PlannerScreen() {
           <View style={s.heroHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Zap size={20} color={C.accentCyan} />
-              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{selectedExam} Analytics</Text>
+              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{exam} Analytics</Text>
             </View>
             <View style={s.heroBadge}>
               <Text style={s.badgeTxt}>
@@ -365,21 +364,21 @@ export default function PlannerScreen() {
 
         {/* Focus Insights Expansion (v1.5.0) */}
         <View style={s.insightsGrid}>
-           <View style={[s.insightCard, { flex: 1 }]}>
-              <Text style={s.insightLabel}>WEEKLY FOCUS</Text>
-              <Text style={s.insightVal}>{focusStats.totalHours}h</Text>
-              <View style={s.miniProgress}><View style={[s.miniFill, { width: '65%', backgroundColor: C.accentCyan }]} /></View>
-           </View>
-           <View style={[s.insightCard, { flex: 1 }]}>
-              <Text style={s.insightLabel}>VELOCITY (Q/m)</Text>
-              <Text style={s.insightVal}>{focusStats.velocity}</Text>
-              <View style={s.miniProgress}><View style={[s.miniFill, { width: '45%', backgroundColor: C.accentIndigo }]} /></View>
-           </View>
+          <View style={[s.insightCard, { flex: 1 }]}>
+            <Text style={s.insightLabel}>WEEKLY FOCUS</Text>
+            <Text style={s.insightVal}>{focusStats.totalHours}h</Text>
+            <View style={s.miniProgress}><View style={[s.miniFill, { width: '65%', backgroundColor: C.accentCyan }]} /></View>
+          </View>
+          <View style={[s.insightCard, { flex: 1 }]}>
+            <Text style={s.insightLabel}>VELOCITY (Q/m)</Text>
+            <Text style={s.insightVal}>{focusStats.velocity}</Text>
+            <View style={s.miniProgress}><View style={[s.miniFill, { width: '45%', backgroundColor: C.accentIndigo }]} /></View>
+          </View>
         </View>
 
         <View style={[s.insightCard, { marginBottom: SPACING.xl }]}>
-           <Text style={s.insightLabel}>TOP PERFORMING TOPIC (7D)</Text>
-           <Text style={[s.insightVal, { fontSize: 18, marginTop: 4 }]} numberOfLines={1}>{focusStats.topTopic}</Text>
+          <Text style={s.insightLabel}>TOP PERFORMING TOPIC (7D)</Text>
+          <Text style={[s.insightVal, { fontSize: 18, marginTop: 4 }]} numberOfLines={1}>{focusStats.topTopic}</Text>
         </View>
 
         {loading ? (
@@ -419,39 +418,44 @@ export default function PlannerScreen() {
 
                   return (
                     <View key={t.id} style={{ width: cardW }}>
-                      <Pressable
-                        onPress={() => {
-                          setExam(selectedExam);
-                          setSection(t.section);
-                          setTopic(t.topic);
-                          router.push('/focus');
-                        }}
-                        style={({ pressed }) => [
+                      <View
+                        style={[
                           s.topicCard,
-                          hard && { borderColor: 'rgba(239, 68, 68, 0.2)' },
-                          pressed && { opacity: 0.9, backgroundColor: 'rgba(255,255,255,0.02)' }
+                          hard && { borderColor: 'rgba(239, 68, 68, 0.2)' }
                         ]}
                       >
-                        <View style={s.topicHead}>
-                          <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              cycleLod(t.id);
-                            }}
-                            style={[s.lodBadge, { backgroundColor: lodBg }]}
-                          >
-                            <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
-                          </Pressable>
-                        </View>
+                        <Pressable
+                          onPress={() => {
+                            setExam(exam);
+                            setSection(t.section);
+                            setTopic(t.topic);
+                            router.push('/focus');
+                          }}
+                          style={({ pressed }) => [
+                            pressed && { opacity: 0.9, backgroundColor: 'rgba(255,255,255,0.02)' }
+                          ]}
+                        >
+                          <View style={s.topicHead}>
+                            <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
+                            <Pressable
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                cycleLod(t.id);
+                              }}
+                              style={[s.lodBadge, { backgroundColor: lodBg }]}
+                            >
+                              <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
+                            </Pressable>
+                          </View>
 
-                        <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
-                          {t.topic}
-                        </Text>
+                          <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
+                            {t.topic}
+                          </Text>
 
-                        <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
-                          {prog}% • {t.questionsSolved}/{t.totalQuestions}
-                        </Text>
+                          <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
+                            {prog}% • {t.questionsSolved}/{t.totalQuestions}
+                          </Text>
+                        </Pressable>
 
                         <View style={s.glassStrip}>
                           <Pressable
@@ -480,7 +484,7 @@ export default function PlannerScreen() {
                             <Plus size={20} color={C.white} />
                           </Pressable>
                         </View>
-                      </Pressable>
+                      </View>
                     </View>
                   );
                 })}
@@ -543,22 +547,22 @@ export default function PlannerScreen() {
             </Pressable>
           )}
 
-            <Pressable
-              onPress={() => {
-                Alert.alert(
-                  'Repair Syllabus',
-                  `This will reset your ${exam} study progress to fix alignment issues. This cannot be undone.`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Reset & Repair', style: 'destructive', onPress: resetSyllabus }
-                  ]
-                );
-              }}
-              style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,165,0,0.08)' }, pressed && { opacity: 0.7 }]}
-            >
-              <Zap size={16} color={C.warning} />
-              <Text style={{ color: C.warning, fontSize: 13, fontWeight: '700' }}>REPAIR SYLLABUS CONTENT</Text>
-            </Pressable>
+          <Pressable
+            onPress={() => {
+              Alert.alert(
+                'Repair Syllabus',
+                `This will reset your ${exam} study progress to fix alignment issues. This cannot be undone.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Reset & Repair', style: 'destructive', onPress: resetSyllabus }
+                ]
+              );
+            }}
+            style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,165,0,0.08)' }, pressed && { opacity: 0.7 }]}
+          >
+            <Zap size={16} color={C.warning} />
+            <Text style={{ color: C.warning, fontSize: 13, fontWeight: '700' }}>REPAIR SYLLABUS CONTENT</Text>
+          </Pressable>
 
           <Pressable
             onPress={handleSignOut}
@@ -571,7 +575,7 @@ export default function PlannerScreen() {
             <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 }}>SIGN OUT</Text>
           </Pressable>
 
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.5.1 • Gold Master Release</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
         </View>
       </ScrollView>
     </View>
