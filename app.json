@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.mryash.cfastudy",
-      "versionCode": 4,
+      "versionCode": 5,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#02040C"
