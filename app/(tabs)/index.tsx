@@ -575,7 +575,7 @@ export default function PlannerScreen() {
             <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 }}>SIGN OUT</Text>
           </Pressable>
 
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.4.2 • Ironclad Sync Stabilization</Text>
+          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.5.1 • Gold Master Release</Text>
         </View>
       </ScrollView>
     </View>
