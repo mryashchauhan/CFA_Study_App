@@ -1,8 +1,9 @@
 import { C, R } from '@/constants/theme';
 import { useTimer } from '@/lib/TimerContext';
+import { generateSyncUrl, supabase } from '@/lib/supabaseClient';
 import { Check, RefreshCcw, Zap } from 'lucide-react-native';
 import React from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Alert, Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 /**
@@ -13,8 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export function GlobalCommandHeader() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { userEmail, signInWithGoogle, handleSync, forceMerge } = useTimer();
-  const isDesktop = width >= 1024;
+  const { userId, userEmail, signInWithGoogle, forceMerge } = useTimer();
   const isMobile = width < 768;
 
   const handleAuthPress = () => {
@@ -23,6 +23,37 @@ export function GlobalCommandHeader() {
     } else {
       signInWithGoogle();
     }
+  };
+
+  /**
+   * Magic Link Share (v1.5.2 correction)
+   * Uses centralized generator to build platform-correct sync links.
+   */
+  const onSyncPress = async () => {
+    Alert.alert(
+      'Sync Workspace',
+      'This MAGIC LINK pairs your other device to this study history.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate Link',
+          onPress: async () => {
+            try {
+              const { data: { session } } = await supabase.auth.getSession();
+              const rt = session?.refresh_token || null;
+              const syncURL = generateSyncUrl(userId, rt);
+
+              await Share.share({
+                message: syncURL,
+                url: syncURL,
+              });
+            } catch (a: any) {
+              Alert.alert('Sync Error', 'Cloud sync is currently unavailable.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
@@ -39,9 +70,10 @@ export function GlobalCommandHeader() {
           <View style={s.controls}>
             {/* 1. Magic Link */}
             <Pressable
-              onPress={handleSync}
+              onPress={onSyncPress}
               style={({ pressed }) => [s.btn, s.btnMagic, pressed && { opacity: 0.7 }]}
             >
+
               <RefreshCcw size={14} color={C.accentCyan} />
               <Text style={s.btnTxt}>MAGIC LINK</Text>
             </Pressable>

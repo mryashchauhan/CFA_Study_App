@@ -1,8 +1,9 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import * as Linking from 'expo-linking';
+import { Platform } from 'react-native';
 
-const SUPABASE_URL      = 'https://tvngxonqljparqoanuho.supabase.co';
+const SUPABASE_URL = 'https://tvngxonqljparqoanuho.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable__zbBQmMF9VIke4A7y1V45Q_m8feK7Do';
 
 /*
@@ -20,11 +21,28 @@ function getClient(): SupabaseClient {
         storage: AsyncStorage,
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: Platform.OS === 'web', 
+        detectSessionInUrl: Platform.OS === 'web',
       },
     });
   }
   return _client;
+}
+
+/**
+ * Centralized Sync URL Generator (v1.5.2 "Gold Master")
+ * Single source of truth for all auth/sync redirects.
+ */
+export function generateSyncUrl(userId: string | null, refreshToken: string | null): string {
+  if (Platform.OS === 'web') {
+    return `https://cfa-study-app-self.vercel.app/?sync=${userId || ''}${refreshToken ? `&rt=${refreshToken}` : ''}`;
+  }
+  // Mobile: Use Expo Linking to generate the correct app scheme URL
+  return Linking.createURL('/', {
+    queryParams: {
+      sync: userId || '',
+      rt: refreshToken || ''
+    }
+  });
 }
 
 /**
@@ -55,3 +73,4 @@ export async function ensureAuth(): Promise<string> {
   if (!data.session) throw new Error('Anonymous auth returned no session');
   return data.session.user.id;
 }
+

@@ -12,7 +12,7 @@ import React, {
   useState,
 } from 'react';
 import { Alert, AppState, AppStateStatus, Platform, Share } from 'react-native';
-import { ensureAuth, supabase } from './supabaseClient';
+import { ensureAuth, generateSyncUrl, supabase } from './supabaseClient';
 
 /* ────────────────────────────────────────────────────
    Types
@@ -67,7 +67,6 @@ export interface TimerCtx {
   signOut: () => Promise<void>;
   forceMerge: () => Promise<void>;
   manualMerge: (oldId: string) => Promise<void>;
-  handleSync: () => Promise<void>;
   resetSyllabus: () => Promise<void>;
   userEmail: string | null;
   topics: TopicRecord[];
@@ -156,6 +155,65 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     stateRef.current = { ratio, exam, section, topic };
   }, [ratio, exam, section, topic]);
 
+  // DEEP LINK HANDLER: Standardized Auth & Handshake parsing
+  // v1.5.2 Correction: Handles cold launch and background events
+  const handleUrl = async (url: string) => {
+    if (!url) return;
+    if (handledUrlRef.current === url) return;
+    handledUrlRef.current = url; 
+
+    try {
+      console.log('[TimerContext] Handshaking URL:', url);
+      
+      // Normalize: Both Fragments (#) and Queries (?) must be parsed
+      const normalizedUrl = url.replace('#', '?');
+      const searchParams = new URLSearchParams(normalizedUrl.split('?')[1] || '');
+      
+      const code = searchParams.get('code');
+      const access_token = searchParams.get('access_token');
+      const refresh_token = searchParams.get('refresh_token') || searchParams.get('rt');
+      const sync_id = searchParams.get('sync');
+
+      let sessionRestored = false;
+
+      // PRIORITY 1: Exchange Code for Session (PKCE)
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) sessionRestored = true;
+      } 
+      // PRIORITY 2: Full Token Pair restoration
+      else if (access_token && refresh_token) {
+        const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (!error) sessionRestored = true;
+      } 
+      // PRIORITY 3: Single Token Refresh (Guarded Fallback)
+      else if (refresh_token) {
+        try {
+          const { error } = await supabase.auth.refreshSession({ refresh_token });
+          if (!error) sessionRestored = true;
+        } catch (e) {
+          console.warn('[TimerContext] Guarded refresh failed', e);
+        }
+      }
+
+      // IDENTITY ADOPTION: Only proceed if session restoration was successful
+      if (sessionRestored) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user?.id) {
+          if (sync_id && sync_id !== session.user.id) {
+            await AsyncStorage.setItem('merge_from_id', sync_id);
+          }
+          // Immediate re-load to adoption state
+          loadAll(true);
+        }
+      } else if (refresh_token || code) {
+        console.warn('[TimerContext] Session restoration failed. Continuing as guest.');
+      }
+    } catch (e) {
+      console.error("[TimerContext] Lifecycle auth error:", e);
+    }
+  };
+
   const loadAll = useCallback(async (mounted: boolean) => {
     if (authLock.current) return;
     authLock.current = true;
@@ -165,13 +223,20 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     } catch (e) { }
 
     try {
-      // 1. Standard Session Check (Security Lockdown: Manual sync override removed)
+      // 1. Initial State Sync (Strict Correction Pass)
+      const initialUrl = await Linking.getInitialURL();
+      if (initialUrl && mounted) {
+        await handleUrl(initialUrl);
+      }
+
+      // 2. Verified Session Load
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session?.user && mounted) {
         const newId = session.user.id;
-        setUserEmail(session.user.email ?? 'Google User');
+        setUserEmail(session.user.email ?? 'Authenticated User');
+        
         try {
-          // CHECK FOR PENDING MERGE
           const oldId = await AsyncStorage.getItem('merge_from_id');
           if (oldId && oldId !== newId) {
             await mergeIdentity(oldId, newId);
@@ -186,7 +251,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       setUserEmail(null);
 
-      // 3. Fallback to Anonymous
+      // 3. Guaranteed Anonymous Bootstrap
       const uid = await ensureAuth();
       if (mounted) {
         setUserId(uid);
@@ -200,47 +265,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     } finally {
       authLock.current = false;
     }
-  }, [sync, rt, router]);
+  }, [router]);
 
   useEffect(() => {
     let mounted = true;
     loadAll(mounted);
 
-    // DEEP LINK HANDLER (for Mobile Auth Redirects)
-    const handleUrl = async (url: string) => {
-      if (!url) return;
-      if (handledUrlRef.current === url) return;
-      handledUrlRef.current = url; // LOCK IMMEDIATELY before any async work
-
-      try {
-        // Manual Parsing (Bypass Linking.parse for fragment safety)
-        const tokenStr = url.includes('#') ? url.split('#')[1] : url.split('?')[1] || '';
-        const params = new URLSearchParams(tokenStr);
-        const code = params.get('code');
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
-
-        if (code) {
-          await supabase.auth.exchangeCodeForSession(code);
-        } else if (access_token && refresh_token) {
-          await supabase.auth.setSession({ access_token, refresh_token });
-        }
-
-        // VERIFY SESSION (CRITICAL)
-        const { data } = await supabase.auth.getSession();
-        if (!data.session || !data.session.user?.id) {
-          throw new Error("Invalid session after OAuth");
-        }
-
-        // Handled via immediate lock at top
-        // No manual loadAll needed (managed by onAuthStateChange)
-
-      } catch (e) {
-        console.error("Deep link auth failed", e);
-      }
-    };
-
-    Linking.getInitialURL().then(url => { if (url) handleUrl(url); });
+    // Runtime deep link listeners (v1.5.2)
     const linkSub = Linking.addEventListener('url', (event) => handleUrl(event.url));
 
     // GLOBAL AUTH HEARTBEAT: Reacts to logins/logouts in real-time
@@ -250,8 +281,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       const currentUserId = session?.user?.id;
       if (
         (event === 'SIGNED_IN' ||
-         event === 'TOKEN_REFRESHED' ||
-         event === 'USER_UPDATED') &&
+          event === 'TOKEN_REFRESHED' ||
+          event === 'USER_UPDATED') &&
         currentUserId !== userId
       ) {
         loadAll(mounted);
@@ -267,7 +298,8 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       linkSub.remove();
     };
-  }, [loadAll]);
+  }, [loadAll, userId]);
+
 
   // UPDATED: Centralized Topics Sync Effect with Auto-Seeding (v1.5.0)
   useEffect(() => {
@@ -617,7 +649,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
   const mergeIdentity = async (oldId: string, newId: string) => {
     if (oldId === newId) return;
-    
+
     let topicsMigrated = false;
     let timerMigrated = false;
 
@@ -694,76 +726,29 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleSync = async () => {
-    Alert.alert(
-      'Sync Workspace',
-      'This MAGIC LINK will instantly pair your other device to this study history without any login.\n\nInstructions:\n1. Share this link to your laptop/other device.\n2. Open it there to sync everything.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Generate Link',
-          onPress: async () => {
-            try {
-              const { data: { session } } = await supabase.auth.getSession();
-              const rt = session?.refresh_token;
-              const syncURL = `https://cfa-study-app-self.vercel.app/?sync=${userId}${rt ? `&rt=${rt}` : ''}`;
-
-              await Share.share({
-                message: syncURL,
-                url: syncURL,
-              });
-            } catch (error: any) {
-              Alert.alert('Sharing Error', 'Unable to generate sync link at this time.');
-            }
-          }
-        }
-      ]
-    );
-  };
-
   const signInWithGoogle = async () => {
     try {
-      if (userId) {
-        // Cache the current anonymous ID as the source for the upcoming identity merge
-        await AsyncStorage.setItem('merge_from_id', userId);
-      }
-
-      // Platform-aware redirect for OAuth
+      if (userId) await AsyncStorage.setItem('merge_from_id', userId);
       const redirectTo = Platform.OS === 'web'
         ? 'https://cfa-study-app-self.vercel.app/google-auth'
         : Linking.createURL('/google-auth');
-
-      // 1. Request the secure OAuth URL from Supabase
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true, // Crucial: Prevents Supabase from attempting a web redirect
-        },
+        options: { redirectTo, skipBrowserRedirect: true },
       });
-
       if (error) {
         Alert.alert('Login Error', error.message);
         return;
       }
-
-      // 2. Launch the native browser overlay for the user to authenticate
       if (data?.url) {
-        // On Web, we simply redirect to the OAuth URL
         if (Platform.OS === 'web') {
           window.location.href = data.url;
           return;
         }
-
-        // On Native, we use the browser overlay
         const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        
-        if (res.type !== 'success') {
-          console.log('Auth session was cancelled or failed.');
-        }
+        if (res.type !== 'success') console.log('Auth session was cancelled.');
       }
     } catch (e) {
-      console.error('Google Sign-In Exception:', e);
       Alert.alert('Login Error', 'An unexpected error occurred during authentication.');
     }
   };
@@ -785,9 +770,7 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         await mergeIdentity(oldId, userId);
         await AsyncStorage.removeItem('merge_from_id');
         loadAll(true);
-        Alert.alert('Sync Successful', `History from ${oldId.slice(0, 6)}... merged into your Google account.`);
-      } else {
-        Alert.alert('Sync Check', 'Your study data is already up to date.');
+        Alert.alert('Sync Successful', 'Your profile and progress have been synchronized.');
       }
     } catch (e) { }
   };
@@ -804,10 +787,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetSyllabus = async () => {
+
     if (!userId) return;
     try {
       console.log(`[TimerContext] RESETTING SYLLABUS: ${exam} for user ${userId}`);
-      
+
       // 1. Wipe existing topics for this exam
       const { error: delErr } = await supabase
         .from('topics')
@@ -819,31 +803,16 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
 
       // 2. Re-seed correct topics
       await seedTopics(userId, exam);
-      
+
       // 3. The existing setupTopicsSync effect will refetch automatically
       // since it's listening to the same 'exam' state.
-      
+
       Alert.alert('Syllabus Repaired', `The ${exam} syllabus has been reset to its default state.`);
     } catch (err) {
       console.error('Reset failed', err);
       Alert.alert('Repair Failed', 'Could not reach server to reset syllabus.');
     }
   };
-
-  /* Identity Merge Effect */
-  useEffect(() => {
-    const autoMerge = async () => {
-      if (!userId) return;
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user?.id === userId && session.user.app_metadata?.provider === 'google') {
-        // We are logged in with google. Check if there is an old anonymous session we can merge from.
-        // For this to work perfectly, we need to have cached the old ID before redirect.
-        // Simplified: Merge is usually done server-side or via a specific 'Link Account' flow.
-        // For now, we will assume standard auth is sufficient.
-      }
-    };
-    autoMerge();
-  }, [userId]);
 
   return (
     <Ctx.Provider
@@ -856,10 +825,11 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           try { await AsyncStorage.setItem('strictMode', JSON.stringify(v)); } catch (e) { }
         },
         startTimer, pauseTimer, resetTimer, submitRecall, refreshAuth: () => loadAll(true),
-        signInWithGoogle, signOut, forceMerge, manualMerge, handleSync, userEmail, userId, topics,
+        signInWithGoogle, signOut, forceMerge, manualMerge, resetSyllabus, userEmail, topics,
       }}
     >
       {children}
     </Ctx.Provider>
   );
 }
+

@@ -27,6 +27,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -48,10 +49,10 @@ interface Topic {
   lod: 'Easy' | 'Medium' | 'Hard';
 }
 
-
 export default function PlannerScreen() {
   const {
-    userId, authReady, exam, setExam, topics: globalTopics, userEmail, resetSyllabus
+    userId, authReady, exam, setExam, setSection, setTopic, refreshAuth,
+    topics: globalTopics, userEmail, resetSyllabus, manualMerge
   } = useTimer();
   const { width } = useWindowDimensions();
   const router = useRouter();
@@ -59,7 +60,6 @@ export default function PlannerScreen() {
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeChip, setActiveChip] = useState<ExamType>(exam);
   const [showRecoveryEntry, setShowRecoveryEntry] = useState(false);
   const [manualRecoveryID, setManualRecoveryID] = useState('');
   const [focusStats, setFocusStats] = useState({
@@ -83,12 +83,8 @@ export default function PlannerScreen() {
 
   useEffect(() => {
     if (!authReady) return;
-
     setLoading(false);
-
-    if (globalTopics) {
-      setTopics(globalTopics || []);
-    }
+    if (globalTopics) setTopics(globalTopics || []);
 
     const fetchAnalytics = async () => {
       const { data } = await supabase
@@ -125,9 +121,7 @@ export default function PlannerScreen() {
           return { ...t, questionsSolved: v };
         }),
       );
-
       await new Promise(res => setTimeout(res, 50));
-
       try {
         await supabase
           .from('topics')
@@ -159,18 +153,13 @@ export default function PlannerScreen() {
   const handleSignOut = async () => {
     const performSignOut = async () => {
       const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Error signing out:', error.message);
-        return;
-      }
+      if (error) return;
       router.replace('/');
     };
     if (Platform.OS === 'web') {
-      if (window.confirm('Are you sure you want to sign out?')) {
-        await performSignOut();
-      }
+      if (window.confirm('Sign out?')) await performSignOut();
     } else {
-      Alert.alert('Sign Out', 'Are you sure you want to sign out and clear your session?', [
+      Alert.alert('Sign Out', 'Are you sure?', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Sign Out', style: 'destructive', onPress: performSignOut },
       ]);
@@ -182,7 +171,7 @@ export default function PlannerScreen() {
   const remain = totalQ - solved;
   const examDate = new Date(EXAM_DATES[exam] ?? Date.now());
   const daysLeft = Math.ceil((examDate.getTime() - Date.now()) / 86_400_000);
-  const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : 'Exam Day! 🎯';
+  const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : '0';
   const pct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
   const grouped: Record<string, Topic[]> = {};
@@ -197,40 +186,10 @@ export default function PlannerScreen() {
     (grouped[t.section] ??= []).push(t);
   });
 
-  const handleSync = async () => {
-    Alert.alert(
-      'Sync Workspace',
-      'This MAGIC LINK will instantly pair your other device to this study history without any login.\n\nInstructions:\n1. Share this link to your laptop/other device.\n2. Open it there to sync everything.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Generate Link',
-          onPress: async () => {
-            try {
-              // Fetch the current secure session tokens for the handshake
-              const { data: { session } } = await supabase.auth.getSession();
-              const rt = session?.refresh_token;
-
-              const syncURL = `https://cfa-study-app-self.vercel.app/?sync=${userId}${rt ? `&rt=${rt}` : ''}`;
-
-              await Share.share({
-                message: syncURL, // NO TEXT PREFIX - Ensures browsers open ONLY the URL
-                url: syncURL,
-              });
-            } catch (error: any) {
-              Alert.alert('Sync Error', error.message);
-            }
-          }
-        }
-      ]
-    );
-  };
-
   if (!authReady) {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG }]}>
         <ActivityIndicator size="large" color={C.accentCyan} />
-        <Text style={[TYPOGRAPHY.body, { color: C.white, marginTop: 16, opacity: 0.6 }]}>Initializing R1 Sync...</Text>
       </View>
     );
   }
@@ -239,31 +198,19 @@ export default function PlannerScreen() {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG, padding: SPACING.xl }]}>
         <WifiOff size={48} color={C.textMuted} style={{ marginBottom: SPACING.lg }} />
-        <Text style={[TYPOGRAPHY.sectionTitle, { color: C.white, textAlign: 'center', marginBottom: 8 }]}>Connection Required</Text>
-        <Text style={[TYPOGRAPHY.body, { textAlign: 'center', opacity: 0.6, marginBottom: SPACING.xxl }]}>
-          Unable to establish a secure session with the syllabus database. Please check your internet connection.
-        </Text>
-        <Pressable
-          onPress={refreshAuth}
-          style={({ pressed }) => [s.retryBtn, pressed && { opacity: 0.8 }]}
-        >
+        <Text style={[TYPOGRAPHY.sectionTitle, { color: C.white, textAlign: 'center' }]}>Connection Required</Text>
+        <Pressable onPress={refreshAuth} style={{ marginTop: 20 }}>
           <LinearGradient colors={GRADIENTS.cta} style={s.retryGradient}>
-            <RefreshCcw size={18} color={C.white} style={{ marginRight: 8 }} />
-            <Text style={TYPOGRAPHY.buttonText}>Retry Connection</Text>
+            <Text style={{ color: C.white, fontWeight: '700' }}>Retry</Text>
           </LinearGradient>
         </Pressable>
       </View>
     );
   }
 
-  const titleStyle = width >= 768 ? TYPOGRAPHY.screenTitleTablet : TYPOGRAPHY.screenTitleMobile;
-
   return (
     <View style={s.root}>
       <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
-
-      {/* Background Atmosphere - Obsidians */}
-      <View style={[s.blob, s.blob1, { opacity: 0.02 }]} />
 
       <ScrollView
         contentContainerStyle={[
@@ -271,54 +218,28 @@ export default function PlannerScreen() {
           { paddingHorizontal: pad, width: '100%', maxWidth: CONTENT_MAX_W, alignSelf: 'center' }
         ]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-
-
+        {/* Exam Pushing Pills */}
         <View style={s.pills}>
           {EXAM_LIST.map(e => {
             const on = e === exam;
             return (
-              <Pressable
-                key={e}
-                onPress={() => {
-                  setExam(e);
-                }}
-                style={({ pressed }) => [
-                  s.examPill,
-                  on ? s.examPillOn : s.examPillOff,
-                  pressed && { opacity: 0.8 }
-                ]}
-              >
-                {on && (
-                  <LinearGradient
-                    colors={GRADIENTS.glass}
-                    style={[StyleSheet.absoluteFillObject, { borderRadius: R.xs }]}
-                  />
-                )}
+              <Pressable key={e} onPress={() => setExam(e)} style={[s.examPill, on ? s.examPillOn : s.examPillOff]}>
                 <Text style={[s.examPillTxt, on && s.examPillTxtOn]}>{e}</Text>
               </Pressable>
             );
           })}
         </View>
 
+        {/* Global Analytics Hero */}
         <View style={[s.heroCard, SHADOWS.shadowGlass]}>
-          <LinearGradient
-            colors={['rgba(255,255,255,0.01)', 'transparent']}
-            style={[StyleSheet.absoluteFillObject, { borderRadius: R.md }]}
-          />
           <View style={s.heroHeader}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Zap size={20} color={C.accentCyan} />
-              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, fontWeight: '700', color: C.textPrimary }]}>{exam} Analytics</Text>
+              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, color: C.textPrimary }]}>{exam} Analytics</Text>
             </View>
             <View style={s.heroBadge}>
-              <Text style={s.badgeTxt}>
-                {examDate.toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                })}
-              </Text>
+              <Text style={s.badgeTxt}>{examDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
             </View>
           </View>
 
@@ -330,49 +251,32 @@ export default function PlannerScreen() {
             ].map(([lbl, val]) => (
               <View key={lbl} style={s.statBox}>
                 <Text style={s.statLbl}>{lbl}</Text>
-                <View style={s.valContainer}>
-                  <Text
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    style={s.statVal}
-                  >
-                    {val}
-                  </Text>
-                </View>
+                <Text style={s.statVal}>{val}</Text>
               </View>
             ))}
           </View>
 
-          <View style={s.pacingWrap}>
-            <Text style={s.pacing}>
-              Required: <Text style={{ color: C.accentCyan, fontWeight: '700' }}>{daily} Qs / day</Text>
-            </Text>
-          </View>
-
-          <View style={[s.barContainer, { flexDirection: 'row', alignItems: 'center' }]}>
-            <View style={[s.barBgHero, { flex: 1, marginRight: 12 }]}>
+          <View style={s.barContainer}>
+            <View style={s.barBgHero}>
               <LinearGradient
                 colors={GRADIENTS.premiumCTA}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
                 style={[s.barFillHero, { width: `${pct}%` }]}
               />
             </View>
-            <Text style={[s.pctTxt, { marginTop: 0 }]}>{pct}%</Text>
+            <Text style={s.pctTxt}>{pct}% COMPLETE • {daily} Q/DAY TARGET</Text>
           </View>
         </View>
 
-        {/* Focus Insights Expansion (v1.5.0) */}
+        {/* Insights Expansion */}
         <View style={s.insightsGrid}>
           <View style={[s.insightCard, { flex: 1 }]}>
             <Text style={s.insightLabel}>WEEKLY FOCUS</Text>
             <Text style={s.insightVal}>{focusStats.totalHours}h</Text>
-            <View style={s.miniProgress}><View style={[s.miniFill, { width: '65%', backgroundColor: C.accentCyan }]} /></View>
           </View>
           <View style={[s.insightCard, { flex: 1 }]}>
             <Text style={s.insightLabel}>VELOCITY (Q/m)</Text>
             <Text style={s.insightVal}>{focusStats.velocity}</Text>
-            <View style={s.miniProgress}><View style={[s.miniFill, { width: '45%', backgroundColor: C.accentIndigo }]} /></View>
           </View>
         </View>
 
@@ -381,108 +285,62 @@ export default function PlannerScreen() {
           <Text style={[s.insightVal, { fontSize: 18, marginTop: 4 }]} numberOfLines={1}>{focusStats.topTopic}</Text>
         </View>
 
+        {/* Topic Grid */}
         {loading ? (
-          <ActivityIndicator size="large" color={C.accentCyan} style={{ marginTop: SPACING.xxl }} />
+          <ActivityIndicator size="large" color={C.accentCyan} style={{ marginTop: 40 }} />
         ) : processed.length === 0 ? (
           <View style={s.noResults}>
-            <Search size={48} color={C.textMuted} style={{ opacity: 0.2, marginBottom: SPACING.lg }} />
-            <Text style={[TYPOGRAPHY.sectionTitle, { color: C.textPrimary, opacity: 0.5, textAlign: 'center' }]}>No Topics Found</Text>
-            <Text style={[TYPOGRAPHY.body, { textAlign: 'center', opacity: 0.4, marginTop: 4 }]}>Try adjusting your search query.</Text>
+            <Text style={{ color: C.textMuted }}>No Topics Found</Text>
           </View>
         ) : (
           Object.entries(grouped).map(([sec, rows]) => (
             <View key={sec} style={{ marginBottom: SPACING.xl }}>
               <View style={s.secHead}>
                 <LayoutGrid size={18} color={C.accentCyan} />
-                <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel, { fontSize: 20, fontWeight: '800', color: C.white }]}>{pretty(sec)}</Text>
+                <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel]}>{pretty(sec)}</Text>
               </View>
 
               <View style={[s.grid, { gap }]}>
                 {rows.map(t => {
-                  const prog = t.totalQuestions > 0
-                    ? Math.min(100, Math.round((t.questionsSolved / t.totalQuestions) * 100))
-                    : 0;
+                  const p = t.totalQuestions > 0 ? Math.round((t.questionsSolved / t.totalQuestions) * 100) : 0;
                   const hard = t.lod === 'Hard';
                   const easy = t.lod === 'Easy';
-
-                  let lodColor: string = C.warning;
-                  let lodBg = 'rgba(245, 158, 11, 0.05)';
-
-                  if (hard) {
-                    lodColor = C.accentRed;
-                    lodBg = 'rgba(239, 68, 68, 0.08)';
-                  } else if (easy) {
-                    lodColor = C.success;
-                    lodBg = 'rgba(16, 185, 129, 0.08)';
-                  }
+                  const lodColor = hard ? C.accentRed : easy ? C.success : C.warning;
+                  const lodBg = hard ? 'rgba(239, 68, 68, 0.1)' : easy ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)';
 
                   return (
                     <View key={t.id} style={{ width: cardW }}>
-                      <View
-                        style={[
-                          s.topicCard,
-                          hard && { borderColor: 'rgba(239, 68, 68, 0.2)' }
-                        ]}
-                      >
+                      <View style={[s.topicCard, hard && { borderColor: 'rgba(239, 68, 68, 0.2)' }]}>
+                        {/* 1. Navigation Pressable (Sibling) */}
                         <Pressable
                           onPress={() => {
-                            setExam(exam);
                             setSection(t.section);
                             setTopic(t.topic);
                             router.push('/focus');
                           }}
-                          style={({ pressed }) => [
-                            pressed && { opacity: 0.9, backgroundColor: 'rgba(255,255,255,0.02)' }
-                          ]}
+                          style={({ pressed }) => [s.topicPressArea, pressed && { opacity: 0.7 }]}
                         >
-                          <View style={s.topicHead}>
-                            <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
-                            <Pressable
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                cycleLod(t.id);
-                              }}
-                              style={[s.lodBadge, { backgroundColor: lodBg }]}
-                            >
-                              <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
-                            </Pressable>
+                          <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
+                          <Text style={s.topicName} numberOfLines={2}>{t.topic}</Text>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                             <Text style={s.solvedSplit}>{t.questionsSolved} solved</Text>
+                             <Text style={s.solvedSplit}>{p}%</Text>
                           </View>
-
-                          <Text style={[TYPOGRAPHY.cardTitle, s.topicName, { fontSize: isDesktop ? 22 : 22 }]} numberOfLines={2}>
-                            {t.topic}
-                          </Text>
-
-                          <Text style={[s.solvedSplit, { fontSize: 13, marginBottom: SPACING.lg, color: C.textSecondary }]}>
-                            {prog}% • {t.questionsSolved}/{t.totalQuestions}
-                          </Text>
                         </Pressable>
 
+                        {/* 2. LOD Badge (Safe sibling) */}
+                        <Pressable 
+                          onPress={() => cycleLod(t.id)} 
+                          style={[s.lodBadge, { backgroundColor: lodBg, position: 'absolute', top: 12, right: 12 }]}
+                        >
+                          <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
+                        </Pressable>
+
+                        {/* 3. Stepper Strip (Safe sibling) */}
                         <View style={s.glassStrip}>
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              bump(t.id, -1);
-                            }}
-                            style={({ pressed }) => [s.stepBtn, pressed && { opacity: 0.6 }]}
-                          >
-                            <Minus size={20} color={C.textMuted} />
-                          </Pressable>
-
+                          <Pressable onPress={() => bump(t.id, -1)} style={s.stepBtn}><Minus size={14} color={C.textMuted} /></Pressable>
                           <Text style={s.stepVal}>{t.questionsSolved}</Text>
-
-                          <Pressable
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              bump(t.id, 1);
-                            }}
-                            style={({ pressed }) => [
-                              s.stepBtn,
-                              s.stepBtnAdd,
-                              pressed && { opacity: 0.6 }
-                            ]}
-                          >
-                            <Plus size={20} color={C.white} />
-                          </Pressable>
+                          <Pressable onPress={() => bump(t.id, 1)} style={s.stepBtn}><Plus size={14} color={C.white} /></Pressable>
                         </View>
                       </View>
                     </View>
@@ -493,349 +351,87 @@ export default function PlannerScreen() {
           ))
         )}
 
-        {/* RECOVERY DASHBOARD (v1.2.7) */}
-        <View style={{ marginTop: 40, padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', marginBottom: 120 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-            <Zap size={18} color={C.accentCyan} />
-            <Text style={{ color: C.white, fontSize: 16, fontWeight: '700' }}>R1 Sync Recovery</Text>
-          </View>
-
-          <View style={{ gap: 8 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Sync Status:</Text>
-              <Text style={{ color: userEmail ? C.accentCyan : 'rgba(255,255,255,0.6)', fontSize: 12, fontWeight: '600' }}>
-                {userEmail ? 'Authenticated' : 'Guest Mode'}
-              </Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>Identity Key:</Text>
-              <Text style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, fontVariant: ['tabular-nums'] }}>{userId?.slice(0, 12)}...</Text>
-            </View>
-          </View>
-
-          {showRecoveryEntry ? (
-            <View style={{ marginTop: 16, gap: 10 }}>
-              <TextInput
-                style={[s.searchInput, { backgroundColor: 'rgba(255,255,255,0.05)', height: 40, paddingHorizontal: 12 }]}
-                placeholder="Paste Recovery ID..."
-                placeholderTextColor={C.textMuted}
-                value={manualRecoveryID}
-                onChangeText={setManualRecoveryID}
-              />
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <Pressable
-                  onPress={() => manualMerge(manualRecoveryID)}
-                  style={({ pressed }) => [s.syncBtn, { flex: 1, backgroundColor: C.accentCyan }, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={{ color: '#000', fontSize: 13, fontWeight: '700' }}>Confirm Restore</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setShowRecoveryEntry(false)}
-                  style={({ pressed }) => [s.syncBtn, { backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={{ color: C.white }}>Cancel</Text>
-                </Pressable>
-              </View>
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => setShowRecoveryEntry(true)}
-              style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,255,255,0.05)' }, pressed && { opacity: 0.7 }]}
-            >
-              <RefreshCcw size={16} color={C.white} />
-              <Text style={{ color: C.white, fontSize: 13, fontWeight: '700' }}>RESTORE STUDY HISTORY</Text>
+        {/* Sync & Recovery Footer */}
+        <View style={s.recoverySection}>
+          <Text style={s.heroLabel}>SYNC & RECOVERY</Text>
+          <View style={{ gap: 10, marginTop: 12 }}>
+            <Pressable onPress={() => setShowRecoveryEntry(!showRecoveryEntry)} style={s.syncBtn}>
+              <RefreshCcw size={16} color={C.white} /><Text style={{ color: C.white }}>RESTORE HISTORY</Text>
             </Pressable>
-          )}
-
-          <Pressable
-            onPress={() => {
-              Alert.alert(
-                'Repair Syllabus',
-                `This will reset your ${exam} study progress to fix alignment issues. This cannot be undone.`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Reset & Repair', style: 'destructive', onPress: resetSyllabus }
-                ]
-              );
-            }}
-            style={({ pressed }) => [s.syncBtn, { marginTop: 16, backgroundColor: 'rgba(255,165,0,0.08)' }, pressed && { opacity: 0.7 }]}
-          >
-            <Zap size={16} color={C.warning} />
-            <Text style={{ color: C.warning, fontSize: 13, fontWeight: '700' }}>REPAIR SYLLABUS CONTENT</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={handleSignOut}
-            style={({ pressed }) => [
-              s.syncBtn,
-              { marginTop: 16, backgroundColor: 'rgba(239, 68, 68, 0.08)', borderColor: 'rgba(239, 68, 68, 0.2)', justifyContent: 'center' },
-              pressed && { opacity: 0.7 }
-            ]}
-          >
-            <Text style={{ color: '#ef4444', fontSize: 13, fontWeight: '700', letterSpacing: 0.5 }}>SIGN OUT</Text>
-          </Pressable>
-
-          <Text style={{ color: 'rgba(255,255,255,0.2)', fontSize: 10, textAlign: 'center', marginTop: 16 }}>Build Production v1.5.1 • Gold Master Release</Text>
+            {showRecoveryEntry && (
+              <View style={{ gap: 8 }}>
+                <TextInput style={s.searchInput} value={manualRecoveryID} onChangeText={setManualRecoveryID} placeholder="Paste ID..." placeholderTextColor="#444" />
+                <Pressable onPress={() => manualMerge(manualRecoveryID)} style={[s.syncBtn, { backgroundColor: C.accentCyan }]}><Text style={{ color: '#000' }}>Confirm</Text></Pressable>
+              </View>
+            )}
+            <Pressable onPress={resetSyllabus} style={[s.syncBtn, { backgroundColor: 'rgba(255,165,0,0.05)' }]}><Zap size={16} color={C.warning} /><Text style={{ color: C.warning }}>REPAIR SYLLABUS</Text></Pressable>
+            <Pressable onPress={handleSignOut} style={[s.syncBtn, { backgroundColor: 'rgba(239, 68, 68, 0.05)' }]}><Text style={{ color: C.accentRed }}>SIGN OUT</Text></Pressable>
+          </View>
+          <Text style={{ textAlign: 'center', opacity: 0.2, marginTop: 20 }}>Build v1.5.2 • Final Patch</Text>
         </View>
       </ScrollView>
+
+      {/* SEARCH MOUNT */}
+      <View style={s.searchMount}>
+        <View style={s.searchBox}>
+          <Search size={18} color={C.accentCyan} style={{ marginRight: 12, opacity: 0.4 }} />
+          <TextInput placeholder="Search topics..." style={s.input} value={searchQuery} onChangeText={setSearchQuery} placeholderTextColor="#444" />
+        </View>
+      </View>
     </View>
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.primaryBG },
-  blob: {
-    position: 'absolute',
-    borderRadius: 9999,
-    width: 400,
-    height: 400,
-  },
-  blob1: { top: -100, left: -100, backgroundColor: C.accentIndigo },
-
-  scroll: { paddingTop: SPACING.xl, paddingBottom: SPACING.xxxl },
+  scroll: { paddingTop: 20, paddingBottom: 120 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-
-  header: { marginBottom: SPACING.lg, paddingHorizontal: SPACING.xs },
-  headerTop: { flexWrap: 'wrap', gap: 15 },
-  searchWrap: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: R.sm, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 15, minWidth: 260, flexGrow: 1, maxWidth: 400 },
-  searchIcon: { marginRight: 10 },
-  searchClear: { paddingVertical: 10, paddingLeft: 10 },
-  searchInput: { height: 44, color: C.white, fontSize: 14, fontWeight: '600', flex: 1 },
-  subtitle: { ...TYPOGRAPHY.body, fontSize: 13, marginTop: 4, opacity: 0.5 },
-
-  noResults: { alignItems: 'center', justifyContent: 'center', paddingVertical: 100, width: '100%' },
-
-  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: SPACING.xl },
-  examPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: R.xs,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  examPillOff: {
-    borderColor: 'rgba(255,255,255,0.15)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  examPillOn: {
-    borderColor: C.accentCyan,
-    borderWidth: 2,
-    backgroundColor: 'rgba(6,182,212,0.1)'
-  },
+  pills: { flexDirection: 'row', gap: 10, marginBottom: 24, flexWrap: 'wrap' },
+  examPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, borderWidth: 1 },
+  examPillOff: { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' },
+  examPillOn: { borderColor: C.accentCyan, backgroundColor: 'rgba(6,182,212,0.1)' },
   examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   examPillTxtOn: { color: C.white },
 
-  heroCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1.5,
-    borderColor: 'rgba(34, 211, 238, 0.2)',
-    padding: SPACING.lg,
-    marginBottom: SPACING.xxl,
-    overflow: 'hidden',
-  },
-  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroTtlRow: { flexDirection: 'row', alignItems: 'center' },
-  heroBadge: {
-    backgroundColor: '#000',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  badgeTxt: { ...TYPOGRAPHY.meta, color: C.textSecondary, fontSize: 9, letterSpacing: 0.5 },
+  heroCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(34, 211, 238, 0.1)' },
+  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  heroBadge: { backgroundColor: '#000', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  badgeTxt: { fontSize: 10, color: C.textSecondary, fontWeight: '700' },
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
+  statBox: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6, alignItems: 'center' },
+  statLbl: { fontSize: 9, color: C.textMuted, marginBottom: 4, fontWeight: '800' },
+  statVal: { fontSize: 24, color: C.white, fontWeight: '900' },
+  barContainer: { gap: 8 },
+  barBgHero: { height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' },
+  barFillHero: { height: '100%' },
+  pctTxt: { fontSize: 10, color: C.textMuted, fontWeight: '800', textAlign: 'center' },
 
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.lg,
-    backgroundColor: '#000',
-    padding: SPACING.md,
-    borderRadius: R.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    gap: 12,
-  },
-  statBox: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  statLbl: {
-    ...TYPOGRAPHY.meta,
-    marginBottom: 6,
-    fontSize: 9,
-    opacity: 0.6,
-    textAlign: 'center',
-  },
-  valContainer: {
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-  },
-  statVal: { color: C.white, fontSize: 40, fontWeight: '900', textAlign: 'center' },
+  insightsGrid: { flexDirection: 'row', gap: 12, marginBottom: 12 },
+  insightCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
+  insightLabel: { fontSize: 9, color: C.textMuted, letterSpacing: 1, fontWeight: '800' },
+  insightVal: { fontSize: 24, color: C.white, fontWeight: '900', marginTop: 4 },
 
-  pacingWrap: { marginTop: SPACING.md, alignItems: 'center' },
-  pacing: { ...TYPOGRAPHY.body, fontSize: 13, opacity: 0.7 },
-
-  barContainer: { marginTop: SPACING.lg },
-  barBgHero: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: 3,
-    overflow: 'hidden',
-  },
-  barFillHero: { height: 6, borderRadius: 3 },
-  pctTxt: {
-    color: C.textMuted,
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 6,
-    fontWeight: '700',
-  },
-
-  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.md, paddingLeft: SPACING.xs },
-  sectionLabel: { marginBottom: 0, marginLeft: 8, fontSize: 16, opacity: 0.8 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
+  sectionLabel: { color: C.white, fontWeight: '800', fontSize: 18, marginBottom: 0 },
 
-  topicCard: {
-    backgroundColor: C.surface,
-    borderRadius: R.md,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.04)',
-    padding: SPACING.md,
-  },
-  topicHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  topicMeta: { ...TYPOGRAPHY.meta, fontSize: 9, opacity: 0.4, flex: 1 },
-  lodBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  lodTxt: { fontSize: 8, fontWeight: '900', textTransform: 'uppercase' },
-  topicName: { marginBottom: SPACING.md, fontSize: 21, fontWeight: '800', color: C.textPrimary, lineHeight: 28 },
+  topicCard: { backgroundColor: C.surface, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', padding: 16, overflow: 'hidden' },
+  topicPressArea: { paddingBottom: 12 },
+  topicMeta: { fontSize: 9, color: C.textMuted, fontWeight: '700', textTransform: 'uppercase', marginBottom: 4 },
+  topicName: { fontSize: 21, fontWeight: '900', color: C.textPrimary, lineHeight: 28, marginBottom: 12 },
+  solvedSplit: { fontSize: 12, color: C.textSecondary, fontWeight: '700' },
+  lodBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
+  lodTxt: { fontSize: 9, fontWeight: '900' },
+  glassStrip: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 8, padding: 4, justifyContent: 'space-between' },
+  stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 6 },
+  stepVal: { color: C.white, fontSize: 18, fontWeight: '800' },
 
-  topicStatLine: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  progValue: { color: C.textSecondary, fontSize: 11, fontWeight: '700' },
-  solvedSplit: { color: C.textMuted, fontSize: 11, fontWeight: '600', opacity: 0.5 },
-
-  miniBarBg: { height: 3, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 1.5, marginBottom: SPACING.lg, overflow: 'hidden' },
-  miniBarFill: { height: 3, borderRadius: 1.5 },
-
-  syncBtnTxt: {
-    color: C.accentCyan,
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-
-  syncBtnHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(34, 211, 238, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.1)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: R.xs,
-  },
-  syncBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: 'rgba(34, 211, 238, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(34, 211, 238, 0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: R.sm,
-  },
-
-  glassStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingVertical: 6,
-    paddingHorizontal: 6,
-    borderRadius: R.xs,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.04)',
-    gap: 12,
-  },
-  stepBtn: {
-    userSelect: 'none',
-    width: 48,
-    height: 48,
-    borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.02)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepBtnAdd: {
-    backgroundColor: 'rgba(99, 102, 241, 0.1)',
-    borderColor: 'rgba(99, 102, 241, 0.3)',
-  },
-  stepVal: {
-    color: C.textPrimary,
-    fontSize: 18,
-    fontWeight: '800',
-    minWidth: 30,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
-  },
-
-  retryBtn: {
-    borderRadius: R.sm,
-    overflow: 'hidden',
-    width: '100%',
-    maxWidth: 240,
-  },
-  retryGradient: {
-    paddingVertical: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  insightsGrid: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  insightCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: R.sm,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    padding: 16,
-  },
-  insightLabel: {
-    ...TYPOGRAPHY.meta,
-    fontSize: 9,
-    opacity: 0.5,
-    letterSpacing: 1,
-  },
-  insightVal: {
-    color: C.white,
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 4,
-  },
-  miniProgress: {
-    height: 3,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 1.5,
-    marginTop: 12,
-    overflow: 'hidden',
-  },
-  miniFill: {
-    height: '100%',
-    borderRadius: 1.5,
-  },
+  recoverySection: { marginTop: 40, padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12, marginBottom: 40 },
+  syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', padding: 14, borderRadius: 8, justifyContent: 'center' },
+  searchInput: { backgroundColor: 'rgba(255,255,255,0.05)', color: C.white, padding: 12, borderRadius: 6, fontSize: 13 },
+  searchMount: { position: 'absolute', bottom: 30, left: 20, right: 20, zIndex: 100 },
+  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, height: 56, borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
+  input: { flex: 1, color: C.white, fontSize: 16, fontWeight: '600' },
+  heroLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1 },
+  retryGradient: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8 }
 });
