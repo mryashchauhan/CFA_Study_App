@@ -15,15 +15,17 @@ import { useTimer } from '@/lib/TimerContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
+  Flame,
   LayoutGrid,
   Minus,
+  Play,
   Plus,
   RefreshCcw,
   Search,
   WifiOff,
   Zap
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -67,6 +69,8 @@ export default function PlannerScreen() {
     velocity: 0,
     topTopic: 'N/A'
   });
+  const [streak, setStreak] = useState(0);
+  const [todaySolved, setTodaySolved] = useState(0);
 
   const isDesktop = width >= 1200;
   const isTablet = width >= 768 && width < 1200;
@@ -108,6 +112,37 @@ export default function PlannerScreen() {
       }
     };
     fetchAnalytics();
+
+    // Streak + today's session metrics
+    const fetchStreak = async () => {
+      try {
+        const { data } = await supabase
+          .from('focus_sessions')
+          .select('created_at, questions_attempted')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(200);
+        if (!data || data.length === 0) { setStreak(0); setTodaySolved(0); return; }
+        const studyDates = new Set(data.map(r => {
+          const d = new Date(r.created_at);
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        }));
+        let count = 0;
+        const today = new Date();
+        for (let i = 0; i < 365; i++) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - i);
+          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          if (studyDates.has(key)) { count++; } else if (i > 0) { break; }
+        }
+        setStreak(count);
+        const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+        const tq = data.filter(r => new Date(r.created_at) >= todayStart)
+          .reduce((a, r) => a + (r.questions_attempted || 0), 0);
+        setTodaySolved(tq);
+      } catch (e) { console.warn('Streak fetch failed:', e); }
+    };
+    fetchStreak();
   }, [globalTopics, authReady, userId]);
 
   const bump = useCallback(
@@ -174,6 +209,18 @@ export default function PlannerScreen() {
   const daily = daysLeft > 0 ? (remain / daysLeft).toFixed(1) : '0';
   const pct = totalQ > 0 ? Math.min(100, Math.round((solved / totalQ) * 100)) : 0;
 
+  // Greeting & pace
+  const hour = new Date().getHours();
+  const greetingWord = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase();
+  const STUDY_WINDOW = 180;
+  const daysStudied = Math.max(1, STUDY_WINDOW - daysLeft);
+  const expectedPct = Math.min(100, Math.round((daysStudied / STUDY_WINDOW) * 100));
+  const paceDelta = pct - expectedPct;
+  const paceLabel = paceDelta >= 5 ? 'ahead' : paceDelta <= -5 ? 'behind' : 'on track';
+  const paceColor = paceDelta >= 5 ? C.success : paceDelta <= -5 ? C.accentRed : C.accentCyan;
+  const dailyTarget = Math.max(1, Math.ceil(Number(daily)));
+
   const grouped: Record<string, Topic[]> = {};
   const processed = topics
     .filter(t => t.exam === exam)
@@ -231,59 +278,139 @@ export default function PlannerScreen() {
           })}
         </View>
 
-        {/* Global Analytics Hero */}
-        <View style={[s.heroCard, SHADOWS.shadowGlass]}>
-          <View style={s.heroHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Zap size={20} color={C.accentCyan} />
-              <Text style={[TYPOGRAPHY.cardTitle, { marginLeft: 10, fontSize: 18, color: C.textPrimary }]}>{exam} Analytics</Text>
+        {/* Greeting Hero */}
+        <View style={s.greetingCard}>
+          <Text style={s.dateLabel}>{dateStr}</Text>
+          <View style={[s.greetingRow, numCols === 1 && { flexDirection: 'column' }]}>
+            <View style={{ flex: 1 }}>
+              <Text style={s.greetingText}>{greetingWord}, candidate.</Text>
+              <Text style={s.countdownText}>
+                {daysLeft} days until your <Text style={{ fontWeight: '900', color: C.white }}>{exam}</Text> exam on {examDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.
+              </Text>
             </View>
-            <View style={s.heroBadge}>
-              <Text style={s.badgeTxt}>{examDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</Text>
+            <View style={s.greetingActions}>
+              {streak > 0 && (
+                <View style={s.streakBadge}>
+                  <Flame size={14} color={C.warning} />
+                  <Text style={s.streakNum}>{streak}</Text>
+                  <Text style={s.streakLabel}>day streak</Text>
+                </View>
+              )}
+              <Pressable onPress={() => router.push('/focus')} style={({ pressed }) => [s.startFocusBtn, pressed && { opacity: 0.85 }]}>
+                <LinearGradient colors={GRADIENTS.cta} style={s.startFocusInner}>
+                  <Play size={14} color={C.white} fill={C.white} />
+                  <Text style={s.startFocusTxt}>Start focus</Text>
+                </LinearGradient>
+              </Pressable>
             </View>
           </View>
+        </View>
 
-          <View style={s.statsRow}>
-            {[
-              ['SOLVED', String(solved)],
-              ['LEFT', String(remain)],
-              ['DAYS', String(daysLeft)],
-            ].map(([lbl, val]) => (
-              <View key={lbl} style={s.statBox}>
-                <Text style={s.statLbl}>{lbl}</Text>
-                <Text style={s.statVal}>{val}</Text>
+        {/* Hero Metrics */}
+        <View style={[s.heroMetrics, numCols === 1 && { flexDirection: 'column' }]}>
+          <View style={[s.metricCard, numCols > 1 && { flex: 1 }]}>
+            <Text style={s.metricLabel}>TODAY'S TARGET</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+              <Text style={s.metricBigNum}>{todaySolved}</Text>
+              <Text style={s.metricDenom}>/ {dailyTarget}</Text>
+            </View>
+            <Text style={s.metricSub}>{todaySolved >= dailyTarget ? 'On pace' : 'In progress'} · {pct}% done</Text>
+            <View style={s.metricBar}>
+              <LinearGradient colors={GRADIENTS.premiumCTA} start={{x:0,y:0}} end={{x:1,y:0}} style={[s.metricBarFill, { width: `${Math.min(100, Math.round((todaySolved / dailyTarget) * 100))}%` }]} />
+            </View>
+          </View>
+          <View style={[s.metricCard, numCols > 1 && { flex: 1 }]}>
+            <Text style={s.metricLabel}>STUDY STREAK</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+              <Text style={s.metricBigNum}>{streak}</Text>
+              <Text style={s.metricDenom}>days</Text>
+            </View>
+            <Text style={s.metricSub}>{streak > 0 ? 'Keep it going!' : 'Start a session today'}</Text>
+          </View>
+          <View style={[s.metricCard, numCols > 1 && { flex: 1 }]}>
+            <Text style={s.metricLabel}>EXAM PACE</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+              <Text style={[s.metricBigNum, { color: paceColor }]}>{pct}%</Text>
+              <Text style={[s.metricDenom, { color: paceColor }]}>{paceLabel}</Text>
+            </View>
+            <Text style={s.metricSub}>{solved} of {totalQ} solved</Text>
+          </View>
+        </View>
+
+        {/* Today's Plan — Auto-generated */}
+        {(() => {
+          const examTopics = topics.filter(t => t.exam === exam);
+          if (examTopics.length === 0) return null;
+
+          // Score each topic for priority
+          const scored = examTopics.map(t => {
+            const mastery = t.totalQuestions > 0 ? t.questionsSolved / t.totalQuestions : 0;
+            const sectionMeta = SYLLABUS[exam]?.[t.section];
+            const weight = sectionMeta?.weight || 10;
+            let score = 0;
+            let type: 'REVIEW' | 'NEW MATERIAL' | 'PRACTICE' = 'PRACTICE';
+
+            if (t.lod === 'Hard' && mastery < 0.6) { score += 50; type = 'REVIEW'; }
+            else if (mastery < 0.3) { score += 40; type = 'NEW MATERIAL'; }
+            else if (mastery < 0.6) { score += 30; type = 'REVIEW'; }
+            else { score += 10; type = 'PRACTICE'; }
+
+            score += weight; // Higher exam weight = higher priority
+            score += (1 - mastery) * 20; // Lower mastery = higher priority
+
+            return { ...t, score, type, mastery: Math.round(mastery * 100), remaining: t.totalQuestions - t.questionsSolved };
+          });
+
+          const tasks = scored.sort((a, b) => b.score - a.score).slice(0, 4);
+          const totalEstMin = tasks.length * 25; // ~25 min per task
+          const estLabel = totalEstMin >= 60 ? `~${Math.floor(totalEstMin / 60)}h ${totalEstMin % 60}m` : `~${totalEstMin}m`;
+
+          return (
+            <View style={{ marginBottom: SPACING.xl }}>
+              <View style={s.planHeader}>
+                <View>
+                  <Text style={s.planKicker}>TODAY'S PLAN · AUTO-GENERATED</Text>
+                  <Text style={s.planTitle}>{tasks.length} tasks, {estLabel} total</Text>
+                </View>
               </View>
-            ))}
-          </View>
-
-          <View style={s.barContainer}>
-            <View style={s.barBgHero}>
-              <LinearGradient
-                colors={GRADIENTS.premiumCTA}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={[s.barFillHero, { width: `${pct}%` }]}
-              />
+              {tasks.map((task, i) => {
+                const isPriority = task.type === 'REVIEW' || task.type === 'NEW MATERIAL';
+                const typeColor = task.type === 'REVIEW' ? C.accentCyan : task.type === 'NEW MATERIAL' ? C.accentIndigo : C.textMuted;
+                return (
+                  <Pressable
+                    key={task.id}
+                    onPress={() => {
+                      setSection(task.section);
+                      setTopic(task.topic);
+                      router.push('/focus');
+                    }}
+                    style={({ pressed }) => [s.taskCard, pressed && { opacity: 0.8 }]}
+                  >
+                    <View style={s.taskIcon}>
+                      <Zap size={16} color={C.accentCyan} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={s.taskTypeRow}>
+                        <Text style={[s.taskType, { color: typeColor }]}>{task.type}</Text>
+                        <Text style={s.taskSection}>{pretty(task.section)}</Text>
+                        {isPriority && (
+                          <View style={s.priorityBadge}>
+                            <Text style={s.priorityTxt}>PRIORITY</Text>
+                          </View>
+                        )}
+                      </View>
+                      <Text style={s.taskName} numberOfLines={1}>{task.topic}</Text>
+                    </View>
+                    <View style={s.taskMeta}>
+                      <Text style={s.taskRemaining}>{task.remaining} <Text style={{ fontWeight: '600', color: C.textMuted }}>left</Text></Text>
+                      <Text style={s.taskEst}>~25m</Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
             </View>
-            <Text style={s.pctTxt}>{pct}% COMPLETE • {daily} Q/DAY TARGET</Text>
-          </View>
-        </View>
-
-        {/* Insights Expansion */}
-        <View style={s.insightsGrid}>
-          <View style={[s.insightCard, { flex: 1 }]}>
-            <Text style={s.insightLabel}>WEEKLY FOCUS</Text>
-            <Text style={s.insightVal}>{focusStats.totalHours}h</Text>
-          </View>
-          <View style={[s.insightCard, { flex: 1 }]}>
-            <Text style={s.insightLabel}>VELOCITY (Q/m)</Text>
-            <Text style={s.insightVal}>{focusStats.velocity}</Text>
-          </View>
-        </View>
-
-        <View style={[s.insightCard, { marginBottom: SPACING.xl }]}>
-          <Text style={s.insightLabel}>TOP PERFORMING TOPIC (7D)</Text>
-          <Text style={[s.insightVal, { fontSize: 18, marginTop: 4 }]} numberOfLines={1}>{focusStats.topTopic}</Text>
-        </View>
+          );
+        })()}
 
         {/* Topic Grid */}
         {loading ? (
@@ -393,23 +520,28 @@ const s = StyleSheet.create({
   examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
   examPillTxtOn: { color: C.white },
 
-  heroCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 20, marginBottom: 24, borderWidth: 1, borderColor: 'rgba(34, 211, 238, 0.1)' },
-  heroHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  heroBadge: { backgroundColor: '#000', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  badgeTxt: { fontSize: 10, color: C.textSecondary, fontWeight: '700' },
-  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  statBox: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', padding: 12, borderRadius: 6, alignItems: 'center' },
-  statLbl: { fontSize: 9, color: C.textMuted, marginBottom: 4, fontWeight: '800' },
-  statVal: { fontSize: 24, color: C.white, fontWeight: '900' },
-  barContainer: { gap: 8 },
-  barBgHero: { height: 6, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden' },
-  barFillHero: { height: '100%' },
-  pctTxt: { fontSize: 10, color: C.textMuted, fontWeight: '800', textAlign: 'center' },
-
-  insightsGrid: { flexDirection: 'row', gap: 12, marginBottom: 12 },
-  insightCard: { flex: 1, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)' },
-  insightLabel: { fontSize: 9, color: C.textMuted, letterSpacing: 1, fontWeight: '800' },
-  insightVal: { fontSize: 24, color: C.white, fontWeight: '900', marginTop: 4 },
+  // Greeting Hero
+  greetingCard: { marginBottom: 20 },
+  dateLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 },
+  greetingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
+  greetingText: { fontSize: 28, fontWeight: '900', color: C.white, marginBottom: 6 },
+  countdownText: { fontSize: 13, color: C.textMuted, lineHeight: 20 },
+  greetingActions: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' },
+  streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,184,0,0.08)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,184,0,0.15)' },
+  streakNum: { fontSize: 15, fontWeight: '900', color: C.warning },
+  streakLabel: { fontSize: 11, color: C.textMuted, fontWeight: '600' },
+  startFocusBtn: { borderRadius: R.xs, overflow: 'hidden' },
+  startFocusInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: R.xs },
+  startFocusTxt: { fontSize: 13, fontWeight: '800', color: C.white },
+  // Hero Metrics
+  heroMetrics: { flexDirection: 'row', gap: 12, marginBottom: SPACING.xl },
+  metricCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
+  metricLabel: { fontSize: 9, color: C.textMuted, letterSpacing: 1.2, fontWeight: '800', marginBottom: 8 },
+  metricBigNum: { fontSize: 32, fontWeight: '900', color: C.white },
+  metricDenom: { fontSize: 16, fontWeight: '700', color: C.textMuted },
+  metricSub: { fontSize: 11, color: C.textMuted, fontWeight: '600', marginTop: 4 },
+  metricBar: { height: 4, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden', marginTop: 10 },
+  metricBarFill: { height: '100%', borderRadius: 2 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   secHead: { flexDirection: 'row', alignItems: 'center', marginBottom: 16, gap: 10 },
@@ -433,5 +565,21 @@ const s = StyleSheet.create({
   searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, height: 56, borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
   input: { flex: 1, color: C.white, fontSize: 16, fontWeight: '600' },
   heroLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1 },
-  retryGradient: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8 }
+  retryGradient: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8 },
+  // Phase F: Today's Plan
+  planHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 },
+  planKicker: { fontSize: 9, fontWeight: '800', color: C.textMuted, letterSpacing: 1.2, marginBottom: 4 },
+  planTitle: { fontSize: 18, fontWeight: '800', color: C.white },
+  taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: R.md, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', gap: 14 },
+  taskIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(34,211,238,0.06)', alignItems: 'center', justifyContent: 'center' },
+  taskTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
+  taskType: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
+  taskSection: { fontSize: 9, fontWeight: '700', color: C.textMuted },
+  priorityBadge: { backgroundColor: 'rgba(239,68,68,0.12)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  priorityTxt: { fontSize: 8, fontWeight: '900', color: C.accentRed, letterSpacing: 0.5 },
+  taskName: { fontSize: 15, fontWeight: '800', color: C.white },
+  taskMeta: { alignItems: 'flex-end', flexShrink: 0 },
+  taskRemaining: { fontSize: 13, fontWeight: '800', color: C.white },
+  taskEst: { fontSize: 10, color: C.textMuted, fontWeight: '600', marginTop: 2 },
+  noResults: { paddingVertical: 40, alignItems: 'center' },
 });

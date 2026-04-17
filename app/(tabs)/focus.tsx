@@ -29,6 +29,8 @@ import {
   pretty,
 } from '@/constants/theme';
 
+const PRESET_LABELS: Record<number, string> = { 1: 'Demo', 15: 'Sprint', 25: 'Classic', 52: 'Ultradian', 90: 'Deep work' };
+
 export default function FocusScreen() {
   const { width } = useWindowDimensions();
   const navigation = useNavigation();
@@ -95,6 +97,7 @@ export default function FocusScreen() {
   const mm = String(Math.floor(timeLeft / 60)).padStart(2, '0');
   const ss = String(timeLeft % 60).padStart(2, '0');
   const timerStyle = isDesktop ? TYPOGRAPHY.heroTimerTablet : TYPOGRAPHY.heroTimerMobile;
+  const phaseLabel = isActive ? 'FOCUS' : isFinished ? 'COMPLETE' : 'READY';
 
   if (!authReady) {
     return (
@@ -215,7 +218,7 @@ export default function FocusScreen() {
                 <Circle cx={TIMER_SIZE/2} cy={TIMER_SIZE/2} r={RADIUS} stroke="rgba(255,255,255,0.02)" strokeWidth={STROKE_WIDTH} fill="transparent" />
                 <Circle cx={TIMER_SIZE/2} cy={TIMER_SIZE/2} r={RADIUS} stroke="url(#timerProgress)" strokeWidth={STROKE_WIDTH} strokeDasharray={CIRCUMF} strokeDashoffset={strokeDashoffset} strokeLinecap="round" fill="transparent" rotation="-90" origin={`${TIMER_SIZE/2}, ${TIMER_SIZE/2}`} />
              </Svg>
-             <Text style={[timerStyle, { color: C.white, fontVariant: ['tabular-nums'] }]}>{mm}:{ss}</Text>
+              <Text style={[timerStyle, { color: C.white, fontVariant: ['tabular-nums'] }]}>{mm}:{ss}</Text>
           </View>
           <Pressable onPress={pauseTimer} style={s.zenPauseBtn}>
              <Pause size={18} color={C.textMuted} />
@@ -230,6 +233,14 @@ export default function FocusScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Session Pips */}
+          <View style={s.pipsRow}>
+            {[1,2,3,4].map(i => (
+              <View key={i} style={[s.pip, i === 1 && s.pipActive]} />
+            ))}
+            <Text style={s.pipLabel}>SESSION 1 OF 4</Text>
+          </View>
+
           <View style={s.pathBadge}>
             <Text 
               style={s.pathTxt} 
@@ -311,6 +322,7 @@ export default function FocusScreen() {
                 ]}
               >
                 <View style={s.timerHighlight} />
+                <Text style={s.phaseLabelTxt}>{phaseLabel}</Text>
                 <Text 
                   numberOfLines={1}
                   adjustsFontSizeToFit
@@ -318,6 +330,7 @@ export default function FocusScreen() {
                 >
                   {mm}:{ss}
                 </Text>
+                <Text style={s.tapHint}>Tap play to begin</Text>
               </LinearGradient>
             </View>
 
@@ -351,7 +364,7 @@ export default function FocusScreen() {
           </View>
 
           <View style={[s.card, { paddingVertical: SPACING.lg }]}>
-            <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentIndigo }]}>Sesssion Duration</Text>
+            <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentIndigo }]}>Session Length</Text>
             <View style={s.pillsWrap}>
               {RATIOS.map(r => {
                 const on = r === ratio;
@@ -364,6 +377,7 @@ export default function FocusScreen() {
                       />
                     )}
                     <Text style={[s.pillTxt, on && s.pillTxtOn]}>{r}m</Text>
+                    <Text style={[s.presetSubTxt, on && { color: C.textSecondary }]}>{PRESET_LABELS[r] || ''}</Text>
                   </Pressable>
                 );
               })}
@@ -489,4 +503,12 @@ const s = StyleSheet.create({
   timerWrapZen: { alignItems: 'center', justifyContent: 'center', marginBottom: 180 },
   zenPauseBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 18, paddingHorizontal: 32, borderRadius: R.sm, backgroundColor: 'rgba(255,255,255,0.03)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   zenPauseTxt: { color: C.textPrimary, opacity: 0.6, fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
+  // Phase B additions
+  pipsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: SPACING.md },
+  pip: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.1)' },
+  pipActive: { backgroundColor: C.accentCyan, width: 8, height: 8, borderRadius: 4 },
+  pipLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1.5, marginLeft: 8 },
+  phaseLabelTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 3, color: C.textMuted, marginBottom: 4 },
+  tapHint: { fontSize: 11, color: C.textMuted, opacity: 0.4, marginTop: 6 },
+  presetSubTxt: { fontSize: 9, color: C.textMuted, opacity: 0.5, marginTop: 2, textAlign: 'center' },
 });
