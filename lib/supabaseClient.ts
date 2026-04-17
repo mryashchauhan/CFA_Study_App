@@ -76,7 +76,8 @@ export async function signInWithGoogle() {
   if (error) throw error;
 
   if (Platform.OS !== 'web' && data?.url) {
-    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    // Use scheme-only prefix so the browser closes on ANY redirect to our app
+    const result = await WebBrowser.openAuthSessionAsync(data.url, 'cfastudyapp://');
 
     if (result.type === 'success' && result.url) {
       const { params } = Linking.parse(result.url);

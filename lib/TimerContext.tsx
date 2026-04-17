@@ -729,9 +729,13 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       if (userId) await AsyncStorage.setItem('merge_from_id', userId);
+
+      // Hardcode the redirect URL — Linking.createURL() produces triple-slash
+      // URLs (cfastudyapp:///path) that don't match Supabase's redirect allowlist.
       const redirectTo = Platform.OS === 'web'
         ? 'https://cfa-study-app-self.vercel.app/google-auth'
-        : Linking.createURL('/google-auth');
+        : 'cfastudyapp://google-auth';
+
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { redirectTo, skipBrowserRedirect: true },
@@ -745,8 +749,39 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
           window.location.href = data.url;
           return;
         }
-        const res = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-        if (res.type !== 'success') console.log('Auth session was cancelled.');
+
+        // Use scheme-only prefix so the browser closes on ANY redirect to our app
+        const res = await WebBrowser.openAuthSessionAsync(
+          data.url,
+          'cfastudyapp://'
+        );
+
+        if (res.type === 'success' && res.url) {
+          // Extract tokens from the redirect URL (fragment or query)
+          const fragment = res.url.split('#')[1];
+          const query = res.url.split('?')[1];
+          const urlParams = new URLSearchParams(fragment || query || '');
+
+          const code = urlParams.get('code');
+          const accessToken = urlParams.get('access_token');
+          const refreshToken = urlParams.get('refresh_token');
+
+          if (code) {
+            // PKCE flow: exchange code for session
+            await supabase.auth.exchangeCodeForSession(code);
+          } else if (accessToken && refreshToken) {
+            // Implicit flow: set session directly
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+          }
+
+          // Trigger a full auth reload to pick up the new identity
+          loadAll(true);
+        } else {
+          console.log('Auth session was cancelled or dismissed.');
+        }
       }
     } catch (e) {
       Alert.alert('Login Error', 'An unexpected error occurred during authentication.');
