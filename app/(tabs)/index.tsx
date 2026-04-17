@@ -12,6 +12,7 @@ import {
 } from '@/constants/theme';
 import { supabase } from '@/lib/supabaseClient';
 import { useTimer } from '@/lib/TimerContext';
+import { getTopicStatus } from '@/utils/topicStatus';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import {
@@ -71,6 +72,7 @@ export default function PlannerScreen() {
   });
   const [streak, setStreak] = useState(0);
   const [todaySolved, setTodaySolved] = useState(0);
+  const [lastStudied, setLastStudied] = useState<Record<string, number>>({});
 
   const isDesktop = width >= 1200;
   const isTablet = width >= 768 && width < 1200;
@@ -118,11 +120,11 @@ export default function PlannerScreen() {
       try {
         const { data } = await supabase
           .from('focus_sessions')
-          .select('created_at, questions_attempted')
+          .select('created_at, questions_attempted, topic')
           .eq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(200);
-        if (!data || data.length === 0) { setStreak(0); setTodaySolved(0); return; }
+        if (!data || data.length === 0) { setStreak(0); setTodaySolved(0); setLastStudied({}); return; }
         const studyDates = new Set(data.map(r => {
           const d = new Date(r.created_at);
           return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -140,6 +142,16 @@ export default function PlannerScreen() {
         const tq = data.filter(r => new Date(r.created_at) >= todayStart)
           .reduce((a, r) => a + (r.questions_attempted || 0), 0);
         setTodaySolved(tq);
+
+        // Compute last-studied map: topic → days since last session
+        const recency: Record<string, number> = {};
+        data.forEach(r => {
+          if (!recency[r.topic]) {
+            const daysAgo = Math.floor((Date.now() - new Date(r.created_at).getTime()) / 86400000);
+            recency[r.topic] = daysAgo;
+          }
+        });
+        setLastStudied(recency);
       } catch (e) { console.warn('Streak fetch failed:', e); }
     };
     fetchStreak();
@@ -213,12 +225,9 @@ export default function PlannerScreen() {
   const hour = new Date().getHours();
   const greetingWord = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const dateStr = new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase();
-  const STUDY_WINDOW = 180;
-  const daysStudied = Math.max(1, STUDY_WINDOW - daysLeft);
-  const expectedPct = Math.min(100, Math.round((daysStudied / STUDY_WINDOW) * 100));
-  const paceDelta = pct - expectedPct;
-  const paceLabel = paceDelta >= 5 ? 'ahead' : paceDelta <= -5 ? 'behind' : 'on track';
-  const paceColor = paceDelta >= 5 ? C.success : paceDelta <= -5 ? C.accentRed : C.accentCyan;
+  const paceResult = getTopicStatus(pct, daysLeft);
+  const paceLabel = paceResult.label;
+  const paceColor = paceResult.color;
   const dailyTarget = Math.max(1, Math.ceil(Number(daily)));
 
   const grouped: Record<string, Topic[]> = {};
@@ -357,6 +366,10 @@ export default function PlannerScreen() {
 
             score += weight; // Higher exam weight = higher priority
             score += (1 - mastery) * 20; // Lower mastery = higher priority
+
+            // Recency factor: topics not studied in >3 days get a boost
+            const daysAgo = lastStudied[t.topic] ?? 999;
+            if (daysAgo > 3) score += 10;
 
             return { ...t, score, type, mastery: Math.round(mastery * 100), remaining: t.totalQuestions - t.questionsSolved };
           });

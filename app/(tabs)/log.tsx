@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,6 @@ import {
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Rect, Text as SvgText } from 'react-native-svg';
 import { 
   History as HistoryIcon, 
   Trash2, 
@@ -24,6 +23,10 @@ import {
 } from 'lucide-react-native';
 import { useTimer } from '@/lib/TimerContext';
 import { supabase } from '@/lib/supabaseClient';
+import { getTopicStatus } from '@/utils/topicStatus';
+import { WeeklyChart } from '@/components/WeeklyChart';
+import { TopicMasteryView } from '@/components/TopicMasteryView';
+import { StudyHeatmap } from '@/components/StudyHeatmap';
 import {
   C,
   R,
@@ -85,28 +88,6 @@ export default function HistoryScreen() {
   };
   const streak = computeStreak();
   const [histTab, setHistTab] = useState<'sessions' | 'topics' | 'heatmap'>('sessions');
-
-  // Chart: last 7 days of focus minutes
-  const chartData = useMemo(() => {
-    const days = [];
-    const today = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      days.push(d);
-    }
-    return days.map(day => {
-      const dayKey = `${day.getFullYear()}-${String(day.getMonth()+1).padStart(2,'0')}-${String(day.getDate()).padStart(2,'0')}`;
-      const mins = sessions
-        .filter(ses => {
-          const sd = new Date(ses.created_at);
-          return `${sd.getFullYear()}-${String(sd.getMonth()+1).padStart(2,'0')}-${String(sd.getDate()).padStart(2,'0')}` === dayKey;
-        })
-        .reduce((a, ses) => a + ses.duration_seconds, 0) / 60;
-      return { label: day.toLocaleDateString(undefined, { weekday: 'short' }), minutes: Math.round(mins) };
-    });
-  }, [sessions]);
-  const maxMins = Math.max(1, ...chartData.map(d => d.minutes));
 
   useEffect(() => {
     if (!userId || !authReady) return;
@@ -236,42 +217,14 @@ export default function HistoryScreen() {
         </View>
 
         {/* Daily Focus Chart */}
-        <View style={s.chartCard}>
-          <View style={s.chartHeader}>
-            <View>
-              <Text style={s.chartKicker}>DAILY FOCUS</Text>
-              <Text style={s.chartTitle}>Minutes per day</Text>
-            </View>
-            <View style={s.chartLegend}>
-              <View style={s.legendDot} />
-              <Text style={s.legendTxt}>Focus</Text>
-            </View>
-          </View>
-          <View style={{ height: 140, marginTop: 16 }}>
-            <Svg width="100%" height="140">
-              {chartData.map((d, i) => {
-                const barW = Math.floor((width - 120) / 7);
-                const barMaxH = 100;
-                const barH = maxMins > 0 ? Math.max(4, (d.minutes / maxMins) * barMaxH) : 4;
-                const x = i * (barW + 8) + 8;
-                const y = barMaxH - barH + 8;
-                return (
-                  <React.Fragment key={i}>
-                    <Rect x={x} y={y} width={Math.max(barW - 4, 12)} height={barH} rx={4} fill={d.minutes > 0 ? C.accentCyan : 'rgba(255,255,255,0.04)'} opacity={d.minutes > 0 ? 0.7 + (d.minutes / maxMins) * 0.3 : 1} />
-                    <SvgText x={x + (barW - 4) / 2} y={128} fontSize={10} fill={C.textMuted} textAnchor="middle" fontWeight="700">{d.label}</SvgText>
-                  </React.Fragment>
-                );
-              })}
-            </Svg>
-          </View>
-        </View>
+        <WeeklyChart sessions={sessions} />
 
         {/* History Tabs */}
         <View style={s.tabRow}>
           {(['sessions', 'topics', 'heatmap'] as const).map(tab => (
             <Pressable key={tab} onPress={() => setHistTab(tab)} style={[s.tabBtn, histTab === tab && s.tabBtnOn]}>
               <Text style={[s.tabTxt, histTab === tab && s.tabTxtOn]}>
-                {tab === 'sessions' ? 'Recent sessions' : tab === 'topics' ? 'By topic' : 'Retention heatmap'}
+                {tab === 'sessions' ? 'Recent sessions' : tab === 'topics' ? 'By topic' : 'Study heatmap'}
               </Text>
             </Pressable>
           ))}
@@ -353,7 +306,7 @@ export default function HistoryScreen() {
         )}
 
         {histTab === 'heatmap' && (
-          <HeatmapView sessions={sessions} exam={exam} width={Math.min(width, CONTENT_MAX_W) - (isDesktop ? SPACING.xxxl * 2 : SPACING.lg * 2)} />
+          <StudyHeatmap sessions={sessions} exam={exam} width={Math.min(width, CONTENT_MAX_W) - (isDesktop ? SPACING.xxxl * 2 : SPACING.lg * 2)} />
         )}
       </ScrollView>
     </View>
@@ -480,148 +433,10 @@ const s = StyleSheet.create({
   statCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', alignItems: 'center', gap: 6 },
   statNum: { fontSize: 28, fontWeight: '900', color: C.white },
   statLabel: { fontSize: 9, fontWeight: '800', color: C.textMuted, letterSpacing: 1.2 },
-  // Phase D: Chart
-  chartCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', marginBottom: 24 },
-  chartHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  chartKicker: { fontSize: 9, color: C.textMuted, fontWeight: '800', letterSpacing: 1.2, marginBottom: 4 },
-  chartTitle: { fontSize: 16, color: C.white, fontWeight: '800' },
-  chartLegend: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot: { width: 10, height: 10, borderRadius: 2, backgroundColor: C.accentCyan },
-  legendTxt: { fontSize: 11, color: C.textMuted, fontWeight: '600' },
   // Phase E: Tabs
   tabRow: { flexDirection: 'row', gap: 4, marginBottom: 20, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)', paddingBottom: 0 },
   tabBtn: { paddingHorizontal: 14, paddingVertical: 10 },
   tabBtnOn: { borderBottomWidth: 2, borderBottomColor: C.white },
   tabTxt: { fontSize: 13, fontWeight: '700', color: C.textMuted },
   tabTxtOn: { color: C.white },
-  // Topic mastery
-  topicGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  topicMCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
-  topicMWeight: { fontSize: 9, fontWeight: '800', color: C.textMuted, letterSpacing: 1, marginBottom: 4 },
-  topicMName: { fontSize: 16, fontWeight: '800', color: C.white, marginBottom: 8 },
-  topicMBar: { height: 3, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2, overflow: 'hidden', marginBottom: 8 },
-  topicMBarFill: { height: '100%', borderRadius: 2 },
-  topicMFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  topicMDue: { fontSize: 11, color: C.textMuted, fontWeight: '600' },
-  topicMStatus: { fontSize: 10, fontWeight: '900', letterSpacing: 0.5 },
-  topicMPct: { fontSize: 24, fontWeight: '900', position: 'absolute', top: 16, right: 16 },
-  // Heatmap
-  hmCard: { marginBottom: 20 },
-  hmHint: { fontSize: 11, color: C.textMuted, opacity: 0.6, marginBottom: 16 },
-  hmRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 3 },
-  hmLabel: { width: 120, fontSize: 10, color: C.textSecondary, fontWeight: '600' },
-  hmPct: { width: 36, fontSize: 10, color: C.textMuted, fontWeight: '700', textAlign: 'right' },
-  hmFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 },
-  hmTimeline: { fontSize: 9, color: C.textMuted, fontWeight: '700', letterSpacing: 0.5 },
-  hmScale: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  hmScaleLbl: { fontSize: 9, color: C.textMuted, fontWeight: '600' },
 });
-
-/* ── Topic Mastery Sub-component ── */
-function TopicMasteryView({ exam, topics, isDesktop }: { exam: string, topics: any[], isDesktop: boolean }) {
-  const sections = SYLLABUS[exam] || {};
-  return (
-    <View style={s.topicGrid}>
-      {Object.entries(sections).map(([sec, meta]) => {
-        const secTopics = topics.filter(t => t.exam === exam && t.section === sec);
-        const totalQ = secTopics.reduce((a, t) => a + t.totalQuestions, 0);
-        const solved = secTopics.reduce((a, t) => a + t.questionsSolved, 0);
-        const mastery = totalQ > 0 ? Math.round((solved / totalQ) * 100) : 0;
-        const status = mastery >= 75 ? 'ahead' : mastery >= 50 ? 'on-track' : 'behind';
-        const statusColor = status === 'ahead' ? C.success : status === 'on-track' ? C.accentCyan : C.accentRed;
-        const barColor = status === 'ahead' ? C.success : status === 'on-track' ? C.accentCyan : C.accentRed;
-        return (
-          <View key={sec} style={[s.topicMCard, { width: isDesktop ? '48%' : '100%' }]}>
-            <Text style={s.topicMWeight}>{meta.weight}% OF EXAM</Text>
-            <Text style={s.topicMName}>{pretty(sec)}</Text>
-            <Text style={[s.topicMPct, { color: statusColor }]}>{mastery}%</Text>
-            <View style={s.topicMBar}>
-              <View style={[s.topicMBarFill, { width: `${mastery}%`, backgroundColor: barColor }]} />
-            </View>
-            <View style={s.topicMFooter}>
-              <Text style={s.topicMDue}>{totalQ - solved} remaining</Text>
-              <Text style={[s.topicMStatus, { color: statusColor }]}>{status}</Text>
-            </View>
-          </View>
-        );
-      })}
-    </View>
-  );
-}
-
-/* ── Retention Heatmap Sub-component ── */
-function HeatmapView({ sessions, exam, width }: { sessions: FocusSession[], exam: string, width: number }) {
-  const DAYS = 28;
-  const sections = Object.keys(SYLLABUS[exam] || {});
-  const cellSize = Math.max(8, Math.min(16, (width - 160) / DAYS));
-  const cellGap = 2;
-
-  const heatData = useMemo(() => {
-    const grid: Record<string, Record<string, number>> = {};
-    sections.forEach(sec => { grid[sec] = {}; });
-    const today = new Date();
-    sessions.filter(ses => ses.exam === exam).forEach(ses => {
-      const d = new Date(ses.created_at);
-      const dayKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      const diff = Math.floor((today.getTime() - d.getTime()) / 86400000);
-      if (diff < DAYS && grid[ses.section]) {
-        grid[ses.section][dayKey] = (grid[ses.section][dayKey] || 0) + ses.duration_seconds / 60;
-      }
-    });
-    return grid;
-  }, [sessions, exam]);
-
-  const allVals = Object.values(heatData).flatMap(row => Object.values(row));
-  const maxVal = Math.max(1, ...allVals);
-
-  const days: string[] = [];
-  const today = new Date();
-  for (let i = DAYS - 1; i >= 0; i--) {
-    const d = new Date(today);
-    d.setDate(d.getDate() - i);
-    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
-  }
-
-  return (
-    <View style={s.hmCard}>
-      <Text style={s.hmHint}>Darker = stronger recall. Based on study intensity.</Text>
-      {sections.map(sec => {
-        const totalMins = Object.values(heatData[sec] || {}).reduce((a: number, v: number) => a + v, 0);
-        return (
-          <View key={sec} style={s.hmRow}>
-            <Text style={s.hmLabel} numberOfLines={1}>{pretty(sec)}</Text>
-            <Svg width={DAYS * (cellSize + cellGap)} height={cellSize + 2}>
-              {days.map((dayKey, di) => {
-                const val = heatData[sec]?.[dayKey] || 0;
-                const intensity = val > 0 ? 0.2 + (val / maxVal) * 0.8 : 0.04;
-                return (
-                  <Rect
-                    key={di}
-                    x={di * (cellSize + cellGap)}
-                    y={1}
-                    width={cellSize}
-                    height={cellSize}
-                    rx={2}
-                    fill={val > 0 ? C.accentCyan : 'rgba(255,255,255,0.04)'}
-                    opacity={intensity}
-                  />
-                );
-              })}
-            </Svg>
-            <Text style={s.hmPct}>{Math.round(totalMins)}m</Text>
-          </View>
-        );
-      })}
-      <View style={s.hmFooter}>
-        <Text style={s.hmTimeline}>4 WEEKS AGO → TODAY</Text>
-        <View style={s.hmScale}>
-          <Text style={s.hmScaleLbl}>Less</Text>
-          {[0.1, 0.3, 0.6, 0.9].map((op, i) => (
-            <View key={i} style={{ width: cellSize, height: cellSize, borderRadius: 2, backgroundColor: C.accentCyan, opacity: op }} />
-          ))}
-          <Text style={s.hmScaleLbl}>More</Text>
-        </View>
-      </View>
-    </View>
-  );
-}
