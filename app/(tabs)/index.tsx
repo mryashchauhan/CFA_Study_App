@@ -2,12 +2,11 @@ import {
   C,
   EXAM_DATES,
   EXAM_LIST,
-  ExamType,
   GRADIENTS,
   pretty,
   R,
-  SHADOWS,
   SPACING,
+  SYLLABUS,
   TYPOGRAPHY
 } from '@/constants/theme';
 import { supabase } from '@/lib/supabaseClient';
@@ -26,14 +25,13 @@ import {
   WifiOff,
   Zap
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Platform,
   Pressable,
   ScrollView,
-  Share,
   StyleSheet,
   Text,
   TextInput,

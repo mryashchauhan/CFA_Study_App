@@ -23,7 +23,6 @@ import {
 } from 'lucide-react-native';
 import { useTimer } from '@/lib/TimerContext';
 import { supabase } from '@/lib/supabaseClient';
-import { getTopicStatus } from '@/utils/topicStatus';
 import { WeeklyChart } from '@/components/WeeklyChart';
 import { TopicMasteryView } from '@/components/TopicMasteryView';
 import { StudyHeatmap } from '@/components/StudyHeatmap';
@@ -33,8 +32,6 @@ import {
   SPACING,
   TYPOGRAPHY,
   SHADOWS,
-  GRADIENTS,
-  SYLLABUS,
   pretty,
 } from '@/constants/theme';
 
