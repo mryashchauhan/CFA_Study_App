@@ -125,14 +125,14 @@ export default function PlannerScreen() {
         if (!data || data.length === 0) { setStreak(0); setTodaySolved(0); setLastStudied({}); return; }
         const studyDates = new Set(data.map(r => {
           const d = new Date(r.created_at);
-          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         }));
         let count = 0;
         const today = new Date();
         for (let i = 0; i < 365; i++) {
           const d = new Date(today);
           d.setDate(d.getDate() - i);
-          const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+          const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
           if (studyDates.has(key)) { count++; } else if (i > 0) { break; }
         }
         setStreak(count);
@@ -243,7 +243,7 @@ export default function PlannerScreen() {
   if (!authReady) {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG }]}>
-        <ActivityIndicator size="large" color={C.accentCyan} />
+        <ActivityIndicator size="large" color={C.accentBlue} />
       </View>
     );
   }
@@ -255,7 +255,7 @@ export default function PlannerScreen() {
         <Text style={[TYPOGRAPHY.sectionTitle, { color: C.white, textAlign: 'center' }]}>Connection Required</Text>
         <Pressable onPress={refreshAuth} style={{ marginTop: 20 }}>
           <LinearGradient colors={GRADIENTS.cta} style={s.retryGradient}>
-            <Text style={{ color: C.white, fontWeight: '700' }}>Retry</Text>
+            <Text style={{ color: '#0A0A0A', fontWeight: '700' }}>Retry</Text>
           </LinearGradient>
         </Pressable>
       </View>
@@ -264,7 +264,7 @@ export default function PlannerScreen() {
 
   return (
     <View style={s.root}>
-      <LinearGradient colors={[C.primaryBG, C.secondaryBG]} style={StyleSheet.absoluteFillObject} />
+      <View style={[StyleSheet.absoluteFillObject, { backgroundColor: C.primaryBG }]} />
 
       <ScrollView
         contentContainerStyle={[
@@ -287,15 +287,12 @@ export default function PlannerScreen() {
 
         {/* Greeting Hero */}
         <View style={s.greetingCard}>
-          <Text style={s.dateLabel}>{dateStr}</Text>
-          <View style={[s.greetingRow, numCols === 1 && { flexDirection: 'column' }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.greetingText}>{greetingWord}, candidate.</Text>
-              <Text style={s.countdownText}>
-                {daysLeft} days until your <Text style={{ fontWeight: '900', color: C.white }}>{exam}</Text> exam on {examDate.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}.
-              </Text>
-            </View>
-            <View style={s.greetingActions}>
+          <View style={[s.greetingRow, { flexDirection: 'column', alignItems: 'center', textAlign: 'center', marginVertical: SPACING.xl }]}>
+            <Text style={s.greetingText}>Plan today, <Text style={{ fontStyle: 'italic', color: C.accentBlue }}>not the calendar.</Text></Text>
+            <Text style={s.countdownText}>
+              Focus on what matters. Your personalized study plan adapts to your progress and keeps you on track for exam day.
+            </Text>
+            <View style={[s.greetingActions, { marginTop: SPACING.md }]}>
               {streak > 0 && (
                 <View style={s.streakBadge}>
                   <Flame size={14} color={C.warning} />
@@ -305,7 +302,7 @@ export default function PlannerScreen() {
               )}
               <Pressable onPress={() => router.push('/focus')} style={({ pressed }) => [s.startFocusBtn, pressed && { opacity: 0.85 }]}>
                 <LinearGradient colors={GRADIENTS.cta} style={s.startFocusInner}>
-                  <Play size={14} color={C.white} fill={C.white} />
+                  <Play size={14} color="#0A0A0A" fill="#0A0A0A" />
                   <Text style={s.startFocusTxt}>Start focus</Text>
                 </LinearGradient>
               </Pressable>
@@ -323,7 +320,7 @@ export default function PlannerScreen() {
             </View>
             <Text style={s.metricSub}>{todaySolved >= dailyTarget ? 'On pace' : 'In progress'} · {pct}% done</Text>
             <View style={s.metricBar}>
-              <LinearGradient colors={GRADIENTS.premiumCTA} start={{x:0,y:0}} end={{x:1,y:0}} style={[s.metricBarFill, { width: `${Math.min(100, Math.round((todaySolved / dailyTarget) * 100))}%` }]} />
+              <LinearGradient colors={GRADIENTS.premiumCTA} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[s.metricBarFill, { width: `${Math.min(100, Math.round((todaySolved / dailyTarget) * 100))}%` }]} />
             </View>
           </View>
           <View style={[s.metricCard, numCols > 1 && { flex: 1 }]}>
@@ -337,8 +334,8 @@ export default function PlannerScreen() {
           <View style={[s.metricCard, numCols > 1 && { flex: 1 }]}>
             <Text style={s.metricLabel}>EXAM PACE</Text>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={[s.metricBigNum, { color: paceColor }]}>{pct}%</Text>
-              <Text style={[s.metricDenom, { color: paceColor }]}>{paceLabel}</Text>
+              <Text style={[s.metricBigNum, { color: C.accentBlue }]}>{pct}%</Text>
+              <Text style={[s.metricDenom, { color: C.accentBlue }]}>{paceLabel}</Text>
             </View>
             <Text style={s.metricSub}>{solved} of {totalQ} solved</Text>
           </View>
@@ -386,7 +383,7 @@ export default function PlannerScreen() {
               </View>
               {tasks.map((task, i) => {
                 const isPriority = task.type === 'REVIEW' || task.type === 'NEW MATERIAL';
-                const typeColor = task.type === 'REVIEW' ? C.accentCyan : task.type === 'NEW MATERIAL' ? C.accentIndigo : C.textMuted;
+                const typeColor = task.type === 'REVIEW' ? C.success : task.type === 'NEW MATERIAL' ? C.accentBlue : C.textMuted;
                 return (
                   <Pressable
                     key={task.id}
@@ -398,7 +395,7 @@ export default function PlannerScreen() {
                     style={({ pressed }) => [s.taskCard, pressed && { opacity: 0.8 }]}
                   >
                     <View style={s.taskIcon}>
-                      <Zap size={16} color={C.accentCyan} />
+                      <Zap size={16} color={C.accentBlue} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <View style={s.taskTypeRow}>
@@ -434,7 +431,7 @@ export default function PlannerScreen() {
           Object.entries(grouped).map(([sec, rows]) => (
             <View key={sec} style={{ marginBottom: SPACING.xl }}>
               <View style={s.secHead}>
-                <LayoutGrid size={18} color={C.accentCyan} />
+                <LayoutGrid size={18} color={C.accentBlue} />
                 <Text style={[TYPOGRAPHY.sectionTitle, s.sectionLabel]}>{pretty(sec)}</Text>
               </View>
 
@@ -461,14 +458,14 @@ export default function PlannerScreen() {
                           <Text style={s.topicMeta} numberOfLines={1}>{pretty(t.section)}</Text>
                           <Text style={s.topicName} numberOfLines={2}>{t.topic}</Text>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                             <Text style={s.solvedSplit}>{t.questionsSolved} solved</Text>
-                             <Text style={s.solvedSplit}>{p}%</Text>
+                            <Text style={s.solvedSplit}>{t.questionsSolved} solved</Text>
+                            <Text style={s.solvedSplit}>{p}%</Text>
                           </View>
                         </Pressable>
 
                         {/* 2. LOD Badge (Safe sibling) */}
-                        <Pressable 
-                          onPress={() => cycleLod(t.id)} 
+                        <Pressable
+                          onPress={() => cycleLod(t.id)}
                           style={[s.lodBadge, { backgroundColor: lodBg, position: 'absolute', top: 12, right: 12 }]}
                         >
                           <Text style={[s.lodTxt, { color: lodColor }]}>{t.lod}</Text>
@@ -499,7 +496,7 @@ export default function PlannerScreen() {
             {showRecoveryEntry && (
               <View style={{ gap: 8 }}>
                 <TextInput style={s.searchInput} value={manualRecoveryID} onChangeText={setManualRecoveryID} placeholder="Paste ID..." placeholderTextColor="#444" />
-                <Pressable onPress={() => manualMerge(manualRecoveryID)} style={[s.syncBtn, { backgroundColor: C.accentCyan }]}><Text style={{ color: '#000' }}>Confirm</Text></Pressable>
+                <Pressable onPress={() => manualMerge(manualRecoveryID)} style={[s.syncBtn, { backgroundColor: C.accentBlue }]}><Text style={{ color: '#000' }}>Confirm</Text></Pressable>
               </View>
             )}
             <Pressable onPress={resetSyllabus} style={[s.syncBtn, { backgroundColor: 'rgba(255,165,0,0.05)' }]}><Zap size={16} color={C.warning} /><Text style={{ color: C.warning }}>REPAIR SYLLABUS</Text></Pressable>
@@ -507,15 +504,12 @@ export default function PlannerScreen() {
           </View>
           <Text style={{ textAlign: 'center', opacity: 0.2, marginTop: 20 }}>Build v1.5.2 • Final Patch</Text>
         </View>
-      </ScrollView>
-
-      {/* SEARCH MOUNT */}
-      <View style={s.searchMount}>
-        <View style={s.searchBox}>
-          <Search size={18} color={C.accentCyan} style={{ marginRight: 12, opacity: 0.4 }} />
-          <TextInput placeholder="Search topics..." style={s.input} value={searchQuery} onChangeText={setSearchQuery} placeholderTextColor="#444" />
+        {/* INLINE SEARCH */}
+        <View style={s.inlineSearch}>
+          <Search size={18} color={C.accentBlue} style={{ marginRight: 12, opacity: 0.4 }} />
+          <TextInput placeholder="Search topics..." style={s.input} value={searchQuery} onChangeText={setSearchQuery} placeholderTextColor="#666" />
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -526,24 +520,24 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pills: { flexDirection: 'row', gap: 10, marginBottom: 24, flexWrap: 'wrap' },
   examPill: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 6, borderWidth: 1 },
-  examPillOff: { borderColor: 'rgba(255,255,255,0.1)', backgroundColor: 'rgba(255,255,255,0.03)' },
-  examPillOn: { borderColor: C.accentCyan, backgroundColor: 'rgba(6,182,212,0.1)' },
+  examPillOff: { borderColor: 'rgba(255,255,255,0.06)', backgroundColor: 'rgba(255,255,255,0.02)' },
+  examPillOn: { borderColor: C.accentBlue, backgroundColor: 'rgba(250,191,65,0.08)' },
   examPillTxt: { color: C.textMuted, fontSize: 13, fontWeight: '700' },
-  examPillTxtOn: { color: C.white },
+  examPillTxtOn: { color: C.accentBlue },
 
   // Greeting Hero
   greetingCard: { marginBottom: 20 },
   dateLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1.5, marginBottom: 6 },
-  greetingRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 },
-  greetingText: { fontSize: 28, fontWeight: '900', color: C.white, marginBottom: 6 },
-  countdownText: { fontSize: 13, color: C.textMuted, lineHeight: 20 },
+  greetingRow: { alignItems: 'center', justifyContent: 'center', gap: 16 },
+  greetingText: { fontFamily: 'PlayfairDisplay_700Bold', fontSize: 44, color: C.white, marginBottom: 8, textAlign: 'center' },
+  countdownText: { fontSize: 15, color: C.textMuted, lineHeight: 22, textAlign: 'center', maxWidth: 500 },
   greetingActions: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0, flexWrap: 'wrap' },
   streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,184,0,0.08)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,184,0,0.15)' },
   streakNum: { fontSize: 15, fontWeight: '900', color: C.warning },
   streakLabel: { fontSize: 11, color: C.textMuted, fontWeight: '600' },
   startFocusBtn: { borderRadius: R.xs, overflow: 'hidden' },
-  startFocusInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: R.xs },
-  startFocusTxt: { fontSize: 13, fontWeight: '800', color: C.white },
+  startFocusInner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 14, borderRadius: R.sm },
+  startFocusTxt: { fontSize: 14, fontWeight: '800', color: '#0A0A0A', letterSpacing: 0.5 },
   // Hero Metrics
   heroMetrics: { flexDirection: 'row', gap: 12, marginBottom: SPACING.xl },
   metricCard: { backgroundColor: C.surface, borderRadius: R.md, padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)' },
@@ -572,9 +566,8 @@ const s = StyleSheet.create({
   recoverySection: { marginTop: 40, padding: 20, backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: 12, marginBottom: 40 },
   syncBtn: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.05)', padding: 14, borderRadius: 8, justifyContent: 'center' },
   searchInput: { backgroundColor: 'rgba(255,255,255,0.05)', color: C.white, padding: 12, borderRadius: 6, fontSize: 13 },
-  searchMount: { position: 'absolute', bottom: 30, left: 20, right: 20, zIndex: 100 },
-  searchBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 16, height: 56, borderRadius: 28, shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.5, shadowRadius: 20 },
   input: { flex: 1, color: C.white, fontSize: 16, fontWeight: '600' },
+  inlineSearch: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingHorizontal: 16, height: 50, borderRadius: 12, marginBottom: 20 },
   heroLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1 },
   retryGradient: { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 8 },
   // Phase F: Today's Plan
@@ -582,7 +575,7 @@ const s = StyleSheet.create({
   planKicker: { fontSize: 9, fontWeight: '800', color: C.textMuted, letterSpacing: 1.2, marginBottom: 4 },
   planTitle: { fontSize: 18, fontWeight: '800', color: C.white },
   taskCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: C.surface, borderRadius: R.md, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.04)', gap: 14 },
-  taskIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(34,211,238,0.06)', alignItems: 'center', justifyContent: 'center' },
+  taskIcon: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(250,191,65,0.06)', alignItems: 'center', justifyContent: 'center' },
   taskTypeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   taskType: { fontSize: 9, fontWeight: '900', letterSpacing: 0.8 },
   taskSection: { fontSize: 9, fontWeight: '700', color: C.textMuted },

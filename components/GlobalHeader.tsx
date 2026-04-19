@@ -62,7 +62,9 @@ export function GlobalCommandHeader() {
         <View style={s.row}>
           {/* Branded Title */}
           <View style={s.brand}>
-            <Zap size={20} color={C.accentCyan} />
+            <View style={s.brandMark}>
+              <Text style={s.brandMarkTxt}>R</Text>
+            </View>
             <Text style={s.brandTxt}>R1</Text>
           </View>
 
@@ -73,8 +75,7 @@ export function GlobalCommandHeader() {
               onPress={onSyncPress}
               style={({ pressed }) => [s.btn, s.btnMagic, pressed && { opacity: 0.7 }]}
             >
-
-              <RefreshCcw size={14} color={C.accentCyan} />
+              <RefreshCcw size={14} color={C.accentBlue} />
               <Text style={s.btnTxt}>MAGIC LINK</Text>
             </Pressable>
 
@@ -89,7 +90,7 @@ export function GlobalCommandHeader() {
             >
               {userEmail ? (
                 <>
-                  <Check size={14} color={C.accentCyan} />
+                  <Check size={14} color={C.accentBlue} />
                   <Text style={[s.btnTxt, s.profileTxt]} numberOfLines={1}>{userEmail}</Text>
                 </>
               ) : (
@@ -148,8 +149,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
   },
   btnMagic: {
-    backgroundColor: 'rgba(34, 211, 238, 0.05)',
-    borderColor: 'rgba(34, 211, 238, 0.1)',
+    backgroundColor: 'rgba(250, 191, 65, 0.05)',
+    borderColor: 'rgba(250, 191, 65, 0.15)',
   },
   btnGoogle: {
     backgroundColor: '#4285F4',
@@ -163,9 +164,24 @@ const s = StyleSheet.create({
   btnTxt: {
     fontSize: 10,
     fontWeight: '800',
-    color: C.accentCyan,
+    color: C.accentBlue,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  brandMark: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(250, 191, 65, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(250, 191, 65, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandMarkTxt: {
+    color: C.accentBlue,
+    fontSize: 14,
+    fontWeight: '900',
   },
   profileTxt: {
     color: C.white,

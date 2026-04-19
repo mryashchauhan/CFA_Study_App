@@ -102,7 +102,7 @@ export default function FocusScreen() {
   if (!authReady) {
     return (
       <View style={[s.center, { backgroundColor: C.primaryBG }]}>
-        <ActivityIndicator size="large" color={C.accentCyan} />
+        <ActivityIndicator size="large" color={C.accentBlue} />
       </View>
     );
   }
@@ -118,7 +118,7 @@ export default function FocusScreen() {
           <ScrollView contentContainerStyle={s.recallWrap} keyboardShouldPersistTaps="handled">
             <View style={[s.card, SHADOWS.shadowGlass, { padding: 32, backgroundColor: '#05070A' }]}>
               <View style={{ alignItems: 'center', marginBottom: 24 }}>
-                 <Award size={48} color={C.accentCyan} />
+                 <Award size={48} color={C.accentBlue} />
                  <Text style={[s.recallTitle, { marginTop: 12 }]}>Session Complete</Text>
                  <Text style={[TYPOGRAPHY.body, { opacity: 0.6, textAlign: 'center' }]}>
                    Diagnostics & Retention Review
@@ -199,8 +199,8 @@ export default function FocusScreen() {
       {/* Background Atmosphere - Only show when NOT active */}
       {!isActive && (
         <>
-          <View style={[s.blob, s.blob1, { opacity: 0.08, backgroundColor: C.accentCyan }]} />
-          <View style={[s.blob, s.blob2, { opacity: 0.06, backgroundColor: C.accentIndigo }]} />
+          <View style={[s.blob, s.blob1, { opacity: 0.08, backgroundColor: C.accentBlue }]} />
+          <View style={[s.blob, s.blob2, { opacity: 0.06, backgroundColor: C.accentBlue }]} />
         </>
       )}
 
@@ -260,9 +260,9 @@ export default function FocusScreen() {
                   width: TIMER_SIZE + 40,
                   height: TIMER_SIZE + 40,
                   borderRadius: (TIMER_SIZE + 40) / 2,
-                  backgroundColor: 'rgba(34, 211, 238, 0.025)',
+                  backgroundColor: 'rgba(250, 191, 65, 0.025)',
                   borderWidth: 2,
-                  borderColor: 'rgba(34, 211, 238, 0.05)',
+                  borderColor: 'rgba(250, 191, 65, 0.05)',
                 },
               ]}
             />
@@ -346,9 +346,9 @@ export default function FocusScreen() {
                   style={s.mainActionGradient}
                 >
                   {isActive ? (
-                    <Pause size={24} color={C.white} />
+                    <Pause size={24} color="#0A0A0A" fill="#0A0A0A" />
                   ) : (
-                    <Play size={24} color={C.white} fill={C.white} />
+                    <Play size={24} color="#0A0A0A" fill="#0A0A0A" />
                   )}
                   <Text style={s.mainActionTxt}>{isActive ? 'PAUSE' : 'DEEP WORK'}</Text>
                 </LinearGradient>
@@ -364,7 +364,7 @@ export default function FocusScreen() {
           </View>
 
           <View style={[s.card, { paddingVertical: SPACING.lg }]}>
-            <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentIndigo }]}>Session Length</Text>
+            <Text style={[TYPOGRAPHY.meta, { marginBottom: SPACING.md, color: C.accentBlue }]}>Session Length</Text>
             <View style={s.pillsWrap}>
               {RATIOS.map(r => {
                 const on = r === ratio;
@@ -465,26 +465,27 @@ const s = StyleSheet.create({
   controlsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: SPACING.md, marginTop: SPACING.md, width: '100%' },
   mainActionWrap: { width: '100%', maxWidth: 200, borderRadius: R.sm, overflow: 'hidden', ...SHADOWS.shadowGlass },
   mainActionGradient: { minHeight: 54, paddingHorizontal: 24, borderRadius: R.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  mainActionTxt: { ...TYPOGRAPHY.buttonText, fontSize: 16, letterSpacing: 2 },
+  mainActionTxt: { ...TYPOGRAPHY.buttonText, fontSize: 16, letterSpacing: 2, color: '#0A0A0A' },
   secondaryActionBtn: { width: 54, height: 54, borderRadius: R.sm, backgroundColor: 'rgba(255, 255, 255, 0.02)', borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', alignItems: 'center', justifyContent: 'center' },
   card: { width: '100%', backgroundColor: C.surface, borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.04)', padding: SPACING.lg, marginBottom: SPACING.md },
   subLabel: { ...TYPOGRAPHY.meta, fontSize: 10, marginTop: SPACING.lg, marginBottom: SPACING.sm, opacity: 0.5 },
   pillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm, marginTop: SPACING.xs },
   pill: { minHeight: 48, paddingHorizontal: 16, justifyContent: 'center', borderRadius: R.xs, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.05)', backgroundColor: 'rgba(255, 255, 255, 0.01)', overflow: 'hidden' },
-  pillOn: { borderColor: C.accentIndigo },
+  pillOn: { borderColor: C.accentBlue },
   pillTxt: { color: C.textMuted, fontSize: 14, fontWeight: '700' },
   pillTxtOn: { color: C.white },
   pillOnExam: { backgroundColor: 'rgba(56, 189, 248, 0.04)', borderColor: 'rgba(56, 189, 248, 0.2)' },
   pillTxtOnExam: { color: C.accentBlue },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   track: { width: 48, height: 28, borderRadius: 14, backgroundColor: 'rgba(0,0,0,0.5)', borderColor: 'rgba(255,255,255,0.05)', borderWidth: 1, padding: 2, justifyContent: 'center' },
-  trackOn: { backgroundColor: C.accentIndigo },
+  trackOn: { backgroundColor: C.accentBlue },
   thumb: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.textMuted },
   thumbOn: { alignSelf: 'flex-end', backgroundColor: C.white },
   recallWrap: { flexGrow: 1, justifyContent: 'center', padding: SPACING.xl },
   recallTitle: { ...TYPOGRAPHY.cardTitle, color: C.textPrimary, marginBottom: SPACING.xs },
+  recallTitle: { ...TYPOGRAPHY.cardTitle, color: C.textPrimary, marginBottom: SPACING.xs },
   inputGroup: { width: '100%', marginBottom: 20 },
-  inputLabel: { ...TYPOGRAPHY.meta, fontSize: 10, color: C.accentCyan, marginBottom: 8 },
+  inputLabel: { ...TYPOGRAPHY.meta, fontSize: 10, color: C.accentBlue, marginBottom: 8 },
   recallInput: { 
     backgroundColor: 'rgba(0,0,0,0.4)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)', 
     borderRadius: R.md, padding: SPACING.lg, color: C.textPrimary, fontSize: 15, 
@@ -506,7 +507,7 @@ const s = StyleSheet.create({
   // Phase B additions
   pipsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: SPACING.md },
   pip: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.1)' },
-  pipActive: { backgroundColor: C.accentCyan, width: 8, height: 8, borderRadius: 4 },
+  pipActive: { backgroundColor: C.accentBlue, width: 8, height: 8, borderRadius: 4 },
   pipLabel: { fontSize: 10, color: C.textMuted, fontWeight: '800', letterSpacing: 1.5, marginLeft: 8 },
   phaseLabelTxt: { fontSize: 11, fontWeight: '800', letterSpacing: 3, color: C.textMuted, marginBottom: 4 },
   tapHint: { fontSize: 11, color: C.textMuted, opacity: 0.4, marginTop: 6 },
